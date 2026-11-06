@@ -1,83 +1,83 @@
-# Adapter: zhihu-hot（知乎热榜）
+# Adapter: zhihu-hot (Zhihu hot list)
 
-被以下 skill 调用：`cheat-seed` Phase 2a、`cheat-trends`。
+Called by the following skills: `cheat-seed` Phase 2a, `cheat-trends`.
 
-> **当前状态**：schema only。实际 fetch 实现归 batch 3。/cheat-seed 在 stub 期由 Claude 通过 `WebFetch` 直接抓取（见下方"过渡期实现"）。
+> **Current status**: schema only. The actual fetch implementation belongs to batch 3. During the stub period, /cheat-seed has Claude fetch directly via `WebFetch` (see "Interim implementation" below).
 
 ---
 
-## 适用场景
+## When to use it
 
-- **`cheat-seed` 默认 source 之一**——cold-start 用户的第一次选题种子
-- **`cheat-trends` 可选 source**——日常补充候选池
+- **One of `cheat-seed`'s default sources** — a cold-start user's first topic seed
+- **An optional `cheat-trends` source** — day-to-day candidate-pool top-up
 
-最贴合：论说 / 议题讨论 / 知识科普类观点视频。知乎话题平均比微博更"可讨论"——一个标题就含问题与立场，省了 brainstorm 一半工。
+Best fit: argumentative / issue-discussion / knowledge-explainer opinion videos. Zhihu topics are on average more "discussable" than Weibo — a single title already contains a question and a stance, saving half the brainstorming work.
 
-## 依赖
+## Dependencies
 
-- 公开端点，**无需登录**
-- 端点：`https://www.zhihu.com/api/v3/feed/topstory/hot-lists/total?limit=50&desktop=true`（JSON）
-- 备选：`https://www.zhihu.com/billboard`（HTML，可作为兜底）
+- Public endpoint, **no login required**
+- Endpoint: `https://www.zhihu.com/api/v3/feed/topstory/hot-lists/total?limit=50&desktop=true` (JSON)
+- Alternative: `https://www.zhihu.com/billboard` (HTML, usable as a fallback)
 
-## Fetch 接口
+## Fetch interface
 
 ```
 fetch(limit: int = 50) -> List[Candidate]
 ```
 
-返回符合 [shared-references/candidate-schema.md](../../shared-references/candidate-schema.md) 的 items 列表。
+Returns a list of items conforming to [shared-references/candidate-schema.md](../../shared-references/candidate-schema.md).
 
-字段映射：
-- `id`：`sha256("zhihu-hot|" + normalized_title + "|" + url_path)[:12]`
-- `title`：知乎问题标题
-- `source`：`"trend:zhihu-hot"`
-- `snapshot_text`：问题标题 + 高赞答案前 200 字摘要（可选——抓不到就只用标题）
-- `snapshot_at`：抓取时间 ISO 8601
-- `url`：知乎问题 URL（如 `https://www.zhihu.com/question/<id>`）
-- 其他字段：null
+Field mapping:
+- `id`: `sha256("zhihu-hot|" + normalized_title + "|" + url_path)[:12]`
+- `title`: the Zhihu question title
+- `source`: `"trend:zhihu-hot"`
+- `snapshot_text`: question title + a 200-character summary of the top answer (optional — if it cannot be fetched, use the title only)
+- `snapshot_at`: fetch time in ISO 8601
+- `url`: the Zhihu question URL (e.g. `https://www.zhihu.com/question/<id>`)
+- Other fields: null
 
-## 失败模式
+## Failure modes
 
-| 症状 | 处理 |
+| Symptom | Handling |
 |---|---|
-| API 端点变更 | 切换到 `/billboard` HTML 兜底 |
-| API 返回需要登录（403） | 返回空列表 + 报告 |
-| 网络不可达 | 返回空列表 + 报告 |
+| API endpoint changed | Switch to the `/billboard` HTML fallback |
+| API requires login (403) | Return an empty list + report |
+| Network unreachable | Return an empty list + report |
 
-**优雅降级**：失败不抛异常——调用方有其他 sources 兜底。
+**Graceful degradation**: failures never throw — the caller has other sources to fall back on.
 
-## 稳定性等级
+## Stability level
 
-★★★★ — 知乎 API 比微博稳定；JSON 端点改动频率低于微博 HTML。
+★★★★ — the Zhihu API is more stable than Weibo's; the JSON endpoint changes less often than Weibo's HTML.
 
-建议节流：`/cheat-seed` 默认每用户每天 ≤ 3 次抓取。
+Suggested throttling: `/cheat-seed` defaults to ≤ 3 fetches per user per day.
 
-## 过渡期实现（stub）
+## Interim implementation (stub)
 
-在 batch 3 写专用 adapter 前，`/cheat-seed` 通过 `WebFetch`：
+Before batch 3 writes a dedicated adapter, `/cheat-seed` uses `WebFetch`:
 
 ```
 WebFetch("https://www.zhihu.com/api/v3/feed/topstory/hot-lists/total?limit=50&desktop=true",
-         "解析 JSON 中 data 数组的每个 item，提取 target.title_area.text 和 target.url，最多 50 条")
+         "parse each item in the JSON data array, extract target.title_area.text and target.url, up to 50 entries")
 ```
 
-如果返回结构识别失败 → 切换到 `/billboard` HTML 抓取兜底。
+If the response structure cannot be recognized → switch to the `/billboard` HTML scraping fallback.
 
-## 内容特点（影响 brainstorm 质量）
+## Content characteristics (affects brainstorm quality)
 
-知乎热榜的标题结构通常是 **完整的疑问句**（"如何看待 X"、"为什么 Y"、"X 的本质是什么"），比微博热搜的关键词更适合直接转化为观点视频选题。
+Zhihu hot-list titles are usually **complete interrogative sentences** ("How should X be viewed", "Why Y", "What is the essence of X"), which are better suited than Weibo hot-search keywords for direct conversion into opinion-video topics.
 
-但要注意：
-- 一些标题太具体（"X 公司裁员事件"）→ Claude brainstorm 时要做"个案 → 普遍"的抽象提升
-- 一些标题太"知乎腔"（学术化、长难句）→ Claude brainstorm 时要做"知乎话术 → 短视频钩子"的转译
+But note:
+- Some titles are too specific ("X company layoff event") → Claude should abstract in brainstorming from "case → universal"
+- Some titles are too "Zhihu-flavored" (academic, long complex sentences) → Claude should translate in brainstorming from "Zhihu register → short-video hook"
 
-## 风险提示
+## Risk notes
 
-- 知乎热榜偶现政治敏感议题——/cheat-seed Phase 1 Q3 的"红线"过滤必要
-- 部分热榜话题已被知乎大 V 高密度覆盖，做视频时差异化不易——粗打分时建议提示用户"该话题已饱和，需要差异化角度"
+- The Zhihu hot list occasionally contains politically sensitive topics — the "red line" filter in /cheat-seed Phase 1 Q3 is necessary
+- Some hot topics are already densely covered by Zhihu influencers, making differentiation hard when making videos — during rough scoring, suggest telling the user "this topic is saturated and needs a differentiated angle"
 
-## 相关 adapter
+## Related adapters
 
-- [weibo-hot.md](weibo-hot.md) — 议题更广但更碎片化，时事评论类更匹配
-- bilibili-popular.md（待）— 视频内容直接对照参考
-- thirdparty-paid.md（待）— 付费稳定数据源
+- [weibo-hot.md](weibo-hot.md) — broader issues but more fragmented; better matched to current-events commentary
+- bilibili-popular.md (pending) — direct video-content comparison reference
+- thirdparty-paid.md (pending) — paid stable data sources

@@ -1,195 +1,195 @@
-# Starter Rubric：观点类视频（Opinion-Based Video）— v2 已校准
+# Starter Rubric: opinion-based video — v2 calibrated
 
-适用于做 2-5 分钟视频、内容是讲一个观点 / 一个概念 / 一篇文章 / 一种社会现象的博主——总之**你的观点本身是产品**，画面只是载体。
+For creators making 2-5 minute videos whose content is one opinion / one concept / one article / one social phenomenon — in short, **your opinion itself is the product**, and the visuals are just the vehicle.
 
-> **重要：这份是已校准的 v2 公式**
-> 来自一个中文观点视频博主（抖音，25+ 已发样本，T+3d/7d/8d 数据回收完毕）。**这是真实生效的版本，不是猜想**。完全没数据的新博主请用 [opinion-video-zero.md](opinion-video-zero.md)（v0 等权占位）。
+> **Important: this is a calibrated v2 formula**
+> It comes from a Chinese opinion-video creator (Douyin, 25+ published samples, T+3d/7d/8d data fully collected). **This is a version that really worked, not a guess**. New creators with absolutely no data should use [opinion-video-zero.md](opinion-video-zero.md) (v0 equal-weight placeholder).
 
 ---
 
-## v2 综合分公式（**已校准**）
+## v2 composite formula (**calibrated**)
 
 ```
 composite = (ER×1.5 + SR×1.5 + HP×1.5 + QL + NA + AB + SAT) / 8.5 × 2.0
 ```
 
-每个维度 0-5 整数分。综合分范围 0-10。
+Each dimension is an integer 0-5. The composite range is 0-10.
 
-权重设定理由：ER / SR / HP 三项 ×1.5，因为情感 / 社会 / 钩子是当前账号最强的传播驱动力。**这些权重是凭直觉设定后被数据部分验证的**，不是回归拟合——你的账号需要重新拟合。
-
----
-
-## 7 个维度
-
-### ER — Emotional Resonance（情感共鸣，权重 ×1.5）
-*稿子能否在前 30 秒让观众产生一种**具体的、能命名的**情感？*
-
-- **0** — 纯信息传递；没有情感钩子
-- **3** — 一般共鸣（"嗯，我也有过这种感觉"）
-- **5** — 锐利、具体、**让人不太愿意承认**的自我识别。观众心想"这就是我，我之前不想承认"
-
-5/5 anchor：暗恋自欺、家庭义务、内化的失败感——任何让观众认出自己同时微微感到不适的内容。
-0 分对照：纯学术陈述、抽象概念论文。
-
-### SR — Social Resonance（社会议题共振，权重 ×1.5）
-*稿子触及一个当下的、有争议的、或结构性重要的社会模式吗？*
-
-- **0** — 纯个人 / 人际层面
-- **3** — 触到一个公认的社会现象（职场动态 / 恋爱 / 家庭），但没加新视角
-- **5** — 命名了一个观众**认识但没有语言形容**的结构性模式
-
-5/5 anchor：参考博主的"房价/状元"——"学生坠楼 vs 高考状元"的非对称冲击直击阶层 / 教育 / 生命价值三个议题交叉。
-0 分对照：纯个人情感（暗恋 / 关系）。
-
-### HP — Hook Potential（钩子强度，权重 ×1.5）
-*前 3 秒能不能逼观众看下去 30 秒？*
-
-- **0** — 通用开场（"大家好，今天聊一聊..."）
-- **3** — 具体的承诺或反直觉断言
-- **5** — 一个具体生动的场景或断言，观众无法停止处理
-
-不要把 HP 与"猎奇"混淆。一个安静但具体的开场（"有些关系不是在某一刻结束的——它们在你还在里面的时候就已经偏移"）也可以是 HP=5。
-
-### QL — Quotable Lines（金句密度，权重 ×1.0）
-*稿子里至少 2-3 行能被截图、能作为独立文字单独传播吗？*
-
-- **0** — 全是叙述；没有警句
-- **3** — 结尾有一句令人记住的
-- **5** — 多句独立可用、分布在稿子不同位置（开场 / 中间 / 结尾）
-
-> **校准 caveat**：参考博主的数据显示 **QL=5 不在于"金句数量"**，更接近"每句金句离开视频后还能在评论里 / 截图里 / 朋友的微信里独立存活吗？"——这个细微的定义偏差会被未来的 v2.1 升级吸收。
-
-### NA — Narrativity（叙事性，权重 ×1.0）
-*有没有一个可辨识的弧线——铺垫、升级、收束——还是平铺直叙的论点列表？*
-
-- **0** — 列表式结构
-- **3** — 松散的主线
-- **5** — 紧凑的三幕结构，结尾 payoff 在开场就已埋好
-
-对观点视频来说，NA 比对叙事视频重要性低。把它当 tiebreaker 维度，不是主驱动。
-
-> **校准 caveat**：参考博主的数据中 NA 与 HP 部分冗余——v2.1 候选版本里 NA 被砍。在你的账号上单独验证。
-
-### AB — Audience Breadth（受众广度，权重 ×1.0）
-*这个议题的潜在受众有多广？*
-
-- **0** — 极小众（专业圈 / 单一兴趣）
-- **3** — 中等（一类人群）
-- **5** — 普世（暗恋 / 家庭 / 工作）
-
-> **校准 caveat**：AB 在参考博主的数据里被发现是**误导信号**——求职是 AB=5 但分播比 0.96%（最低）。"广"不等于"愿意传播"。v2.1 候选版本会用 TS（Topic Shareability）替代 AB。**当前 v2 仍保留 AB，因为 v2.1 还在验证**。
-
-### SAT — Satire Depth（讽刺深度，权重 ×1.0）
-*稿子用了多层反讽 / 戏仿格式 / 自指嘲讽吗？*
-
-- **0** — 真诚直陈
-- **3** — 一层反讽
-- **5** — 嵌套或自指反讽（例如，一篇**关于**某现象的稿子，**用那个现象的格式**写出来）
-
-如果你的频道走真诚路线，SAT 给 3 当占位，**不要**让它影响排序。如果你的频道走戏仿路线，这个维度重要。
-
-5/5 anchor：参考博主的"房价/状元"——三层反讽（虚构国框架 + 学术论文形式戏仿 + 致谢段自我指涉）。
+Why these weights: ER / SR / HP are ×1.5 because emotion / social / hook are currently the account's strongest spread drivers. **These weights were set by intuition and then partially validated by data**, not regression-fitted — your account needs its own fitting.
 
 ---
 
-## v2.1 候选维度（**未升正**，仅供探索）
+## The 7 dimensions
 
-下列两个维度在参考博主的数据上展示了独立预测力，但还没通过完整的升级验证流程。**你不要在自己起步阶段直接用这两个维度**——风险大于收益。
+### ER — Emotional Resonance (weight ×1.5)
+*Can the draft make the audience feel a **concrete, nameable** emotion within the first 30 seconds?*
 
-### MS — Memetic Shareability（模因可挪用性）
-*观众能复用作者的句式吗？*
+- **0** — Pure information transfer; no emotional hook
+- **3** — Ordinary resonance ("yeah, I've felt that too")
+- **5** — Sharp, specific self-recognition that **people are reluctant to admit**. The audience thinks "this is me, and I didn't want to admit it before"
 
-5/5 anchor：参考博主"停止期待"中的「她不一样」/「他不一样」模因——观众主动套用句式自嘲，2266 赞独占榜首，全文出现 12+ 变体。
-0 分对照：金句被原样引用但**不被挪用造句**——参考博主"谁问你了"中的「无需求信息供给」362 赞独占但只能引用。
+5/5 anchor: secret-crush self-deception, family obligation, internalized sense of failure — anything that makes the audience recognize themselves while feeling slightly uncomfortable.
+0-point contrast: pure academic statements, abstract concept papers.
 
-为什么重要：被引用的金句驱动**单次传播**。可挪用的模板驱动**生成式传播**——评论本身变成表演，每次表演都是免费的传播。
+### SR — Social Resonance (weight ×1.5)
+*Does the draft touch a current, controversial, or structurally important social pattern?*
 
-### TS — Topic Shareability（议题分享冲动）
-*观众转发这条视频，转发本身会不会暴露 ta 不想暴露的处境？*
+- **0** — Purely personal / interpersonal
+- **3** — Touches a recognized social phenomenon (workplace dynamics / romance / family) but adds no new perspective
+- **5** — Names a structural pattern the audience **recognizes but has no language for**
 
-- **1** — 转发等于承认一件痛苦或被污名化的事（求职、被冒犯、最近分手且熟人能猜出对象）
-- **3** — 转发是中性的
-- **5** — 转发**本身就是表演**（集体吐槽 / in-group 黑话 / 价值观站队 / 安全的自嘲）
+5/5 anchor: the reference creator's "housing prices / top scorer" — the asymmetric impact of "student falls from a building vs gaokao top scorer" hits the intersection of class / education / value of life.
+0-point contrast: pure personal emotion (secret crush / relationships).
 
-为什么重要：议题广度 ≠ 流量。一个"普世"但社交暴露的议题（如求职）跑不过一个"小众"但分享安全的议题（如吐槽老板）。**Shareability 才是约束变量，不是 breadth**。
+### HP — Hook Potential (weight ×1.5)
+*Can the first 3 seconds force the audience to keep watching for 30 seconds?*
 
-> **如果你想试 v2.1**：跑完 5 篇 v2 校准 + 主动收集 MS 和 TS 的"试评分"作为候选维度数据。证据足够（≥3 样本支持）后通过 `/cheat-bump` 走完整升级流程。
+- **0** — Generic opening ("hello everyone, today let's talk about...")
+- **3** — A concrete promise or counterintuitive assertion
+- **5** — A concrete, vivid scene or assertion the audience cannot stop processing
+
+Do not confuse HP with "clickbait". A quiet but concrete opening ("some relationships do not end at a particular moment — they drift while you are still inside them") can also be HP=5.
+
+### QL — Quotable Lines (weight ×1.0)
+*Are there at least 2-3 lines in the draft that can be screenshotted and spread as standalone text?*
+
+- **0** — All narration; no aphorisms
+- **3** — One memorable line at the end
+- **5** — Multiple independently usable lines, distributed across different parts of the draft (opening / middle / end)
+
+> **Calibration caveat**: the reference creator's data shows **QL=5 is not about "the number of quotable lines"**; it is closer to "can each quotable line survive independently outside the video — in comments / screenshots / a friend's WeChat message?" — this subtle definition drift will be absorbed by a future v2.1 bump.
+
+### NA — Narrativity (weight ×1.0)
+*Is there a recognizable arc — setup, escalation, resolution — or a flat list of arguments?*
+
+- **0** — List-like structure
+- **3** — A loose throughline
+- **5** — A tight three-act structure, with the ending payoff planted in the opening
+
+For opinion videos, NA matters less than for narrative videos. Treat it as a tiebreaker dimension, not a main driver.
+
+> **Calibration caveat**: in the reference creator's data NA partially overlaps with HP — NA is cut in the v2.1 candidate version. Validate it separately on your account.
+
+### AB — Audience Breadth (weight ×1.0)
+*How broad is the topic's potential audience?*
+
+- **0** — Very niche (professional circle / single interest)
+- **3** — Medium (one group of people)
+- **5** — Universal (secret crushes / family / work)
+
+> **Calibration caveat**: AB was found to be a **misleading signal** in the reference creator's data — job hunting is AB=5 but has a share/play ratio of 0.96% (the lowest). "Broad" does not equal "willing to spread". The v2.1 candidate version replaces AB with TS (Topic Shareability). **The current v2 still keeps AB, because v2.1 is still being validated**.
+
+### SAT — Satire Depth (weight ×1.0)
+*Does the draft use multi-layered irony / parody format / self-referential mockery?*
+
+- **0** — Sincere direct statement
+- **3** — One layer of irony
+- **5** — Nested or self-referential irony (e.g. a piece **about** a phenomenon, written **in that phenomenon's format**)
+
+If your channel takes a sincere route, give SAT 3 as a placeholder and **do not** let it affect ordering. If your channel takes a parody route, this dimension matters.
+
+5/5 anchor: the reference creator's "housing prices / top scorer" — three layers of irony (a fictional national framework + academic-paper format parody + a self-referential acknowledgment section).
 
 ---
 
-## Bucket 预测（**仅适用于已有粉丝基础的校准期用户**）
+## v2.1 candidate dimensions (**not promoted**, for exploration only)
 
-> ⚠️ **新人不要用这套绝对桶**。0 粉账号的视频典型在 100-1000 播放区间——照搬下表会让所有预测都落"底部 99%"。
-> Cold-start 用户请用 [opinion-video-zero.md](opinion-video-zero.md) 的**比率桶方案**。
-> Calibration 用户（≥5 篇有数据）由 `/cheat-init` 询问 baseline 后自动派生。
-> 下表是"参考博主"（中文抖音观点视频，~1w 粉，25+ 已发样本）的实际拟合——**不是普适常量**。
+The following two dimensions showed independent predictive power on the reference creator's data, but have not passed the full bump validation process. **Do not use these two dimensions directly at your starting stage** — the risk outweighs the benefit.
 
-不要预测一个具体数字。预测一个 **bucket** + 概率分布。
+### MS — Memetic Shareability
+*Can the audience reuse the author's sentence pattern?*
 
-| Bucket | 范围（万播放）| 参考博主的先验概率 |
+5/5 anchor: the reference creator's "Stop expecting" "she's different" / "he's different" meme — the audience actively reused the pattern to mock themselves, 2,266 likes alone at the top, 12+ variants across the text.
+0-point contrast: a quotable line quoted verbatim but **not used to form new sentences** — in the reference creator's "Who asked you", "demand-free information supply" sits alone at 362 likes but can only be quoted.
+
+Why it matters: a quoted line drives **one-time spread**. A reusable template drives **generative spread** — the comments themselves become performance, and every performance is free distribution.
+
+### TS — Topic Shareability
+*If the audience reposts this video, would the repost itself expose a situation they do not want to expose?*
+
+- **1** — Reposting equals admitting something painful or stigmatized (job hunting, being offended, recently dumped and acquaintances can guess who)
+- **3** — Reposting is neutral
+- **5** — Reposting **is itself a performance** (collective roasting / in-group slang / taking a values stance / safe self-deprecation)
+
+Why it matters: topic breadth ≠ traffic. A "universal" but socially exposing topic (e.g. job hunting) underperforms a "niche" but safe-to-share topic (e.g. roasting your boss). **Shareability is the binding variable, not breadth**.
+
+> **If you want to try v2.1**: run 5 v2 calibrations + actively collect "trial scores" for MS and TS as candidate-dimension data. After the evidence is sufficient (≥3 supporting samples), run the full bump process through `/cheat-bump`.
+
+---
+
+## Bucket prediction (**only for calibration-stage users who already have a follower base**)
+
+> ⚠️ **Newcomers must not use this absolute bucket set**. A 0-follower account's videos typically sit in the 100-1,000 play range — copying the table below makes every prediction land in "the bottom 99%".
+> Cold-start users should use the **ratio bucket scheme** in [opinion-video-zero.md](opinion-video-zero.md).
+> For calibration users (≥5 pieces with data), `/cheat-init` asks for a baseline and derives automatically.
+> The table below is the actual fit of the "reference creator" (Chinese Douyin opinion video, ~10k followers, 25+ published samples) — **not a universal constant**.
+
+Do not predict a specific number. Predict a **bucket** + a probability distribution.
+
+| Bucket | Range (ten-thousands of plays) | Reference creator's prior probability |
 |---|---|---|
-| 底部 | <5w | 5% |
-| 基础盘 | 5-30w | 35% |
-| 命中 | 30-100w | 45% |
-| 爆款 | 100-150w | 12% |
-| 现象级 | >150w | 3% |
+| Floor | <50k | 5% |
+| Base | 50k-300k | 35% |
+| Hit | 300k-1M | 45% |
+| Breakout | 1M-1.5M | 12% |
+| Phenomenal | >1.5M | 3% |
 
-**重要**：按你的账号自己的 percentile 设 bucket 边界。你的"爆款"可能是 5w（参考博主级别）或 5k（新人级别）或 500w（大 V）。直接照抄上表的人会得到永远偏高 / 偏低的预测。
+**Important**: set bucket boundaries by your own account's percentiles. Your "breakout" may be 50k (reference-creator level), 5k (newcomer level), or 5M (big-V level). People who copy the table above directly will get predictions that are permanently too high or too low.
 
-校准过 ≥5 篇后跑 `/cheat-bump --bucket-only` 让系统基于你的实际分布自动派生。
+After calibrating ≥5 pieces, run `/cheat-bump --bucket-only` to let the system derive boundaries automatically from your actual distribution.
 
-每次预测要给：
-- **最可能的 bucket**（headline call）
-- **中枢**（你在那个 bucket 内的点估计）
-- **所有 bucket 的概率分布**（必须加起来 100%）
-
----
-
-## T+N 复盘窗口
-
-默认：**T+3d**。
-
-为什么 3 天而不是 5 / 7：
-- 大多数短视频平台的算法分发决策在 72 小时内基本结束
-- 等更久会引入噪声（缓慢长尾、二次推荐）不增加信号
-- T+3d 让你能**每周跑一次校准循环**，rubric 保持响应速度
-
-只有在你有证据证明自己平台行为不同的时候才覆盖。覆盖记得写进 `rubric_notes.md`。
+Every prediction must give:
+- **The most likely bucket** (headline call)
+- **The center** (your point estimate inside that bucket)
+- **The probability distribution over all buckets** (must sum to 100%)
 
 ---
 
-## Anchors（锚点样本）
+## T+N retrospective window
 
-打分新稿时，找 2-4 个 composite 接近的旧样本，列出它们的实绩。**锚点对比能抓出公式抓不到的错误**。
+Default: **T+3d**.
 
-锚点集是你边发边攒出来的。**在你有 ≥5 篇校准过的作品之前，锚点不可用——这是正常的**。Cold-start 期跳过锚点对比，但要在预测文件里标 `锚点对比：N/A（cold-start）`。
+Why 3 days and not 5 / 7:
+- Algorithmic distribution decisions on most short-video platforms are basically over within 72 hours
+- Waiting longer introduces noise (slow long tail, second-wave recommendations) without adding signal
+- T+3d lets you **run one calibration loop per week**, keeping the rubric responsive
 
----
-
-## 这套 rubric 注定会打错的地方（已知 limitations）
-
-参考博主的数据暴露的失败模式。在你自己的数据里也要警惕：
-
-1. **时长**：rubric 里没有任何维度捕捉稿子时长。4 分钟稿要付出完播率代价。完播率单独追踪
-2. **议题时效 / 平台情绪**：算法偏好会变。上个月被推的话题这个月可能被压
-3. **概念密度**：一个稿子里塞太多自创术语（4 个以上缩写、多个框架）压缩理解负担、伤完播率。当前 rubric 没惩罚这个
-4. **MS / TS 的相互作用**（v2.1 候选维度）：两者独立看可能 OK，但真正爆款需要两个都 ≥4。单维度极致很少够
+Only override it when you have evidence that your platform behaves differently. Remember to write the override into `rubric_notes.md`.
 
 ---
 
-## 打分速度 cheat sheet
+## Anchors (anchor samples)
 
-打新稿的分时给自己定个时间。重点是**给一个能被复盘的判断**，不是写论文。
+When scoring a new draft, find 2-4 old samples with close composites and list their actual performance. **Anchor comparison catches mistakes the formula cannot**.
 
-- **每个维度 30 秒**是合适的节奏。如果某个维度让你想超过这个时间，你在合理化，不是在打分
-- **相信你的第一个整数**。如果你在 3 和 4 之间反复横跳，写 3 + 一个备注。打 5 次以后 rubric 会告诉你是不是系统性偏低
-- **打分前不看锚点**。如果你打分前先查"停止期待打了多少分"，你已经被锚定了。**先盲打，再对比**
+The anchor set is built up as you publish. **Before you have ≥5 calibrated pieces, anchors are unavailable — that is normal**. During cold-start, skip anchor comparison but mark `Anchor comparison: N/A (cold-start)` in the prediction file.
 
 ---
 
-## 与 `cheat-on-content` 子 skill 的对应
+## Where this rubric is bound to score wrong (known limitations)
 
-这份 starter rubric 被以下 skill 读取：
-- `/cheat-init` cold-start 模式 → 默认复制本文件到 `rubric_notes.md`（如选择 calibration 模式且 mode 决定能用 v2 公式）
-- `/cheat-score` 和 `/cheat-predict` → 读 `rubric_notes.md` 拿当前公式
-- `/cheat-bump` → 这份 starter 是 bump 的"先验起点"，bump 后被替换为用户自己拟合的版本
+Failure modes exposed by the reference creator's data. Watch for them in your own data too:
+
+1. **Duration**: no dimension in the rubric captures draft duration. A 4-minute draft pays a completion-rate cost. Track completion rate separately
+2. **Topic timeliness / platform mood**: algorithmic preferences change. A topic that was pushed last month may be suppressed this month
+3. **Concept density**: stuffing too many self-coined terms into one draft (4+ abbreviations, multiple frameworks) compresses comprehension burden and hurts completion rate. The current rubric does not penalize this
+4. **MS / TS interaction** (v2.1 candidate dimensions): each may look OK independently, but a real hit needs both ≥4. Extreme performance on a single dimension is rarely enough
+
+---
+
+## Scoring-speed cheat sheet
+
+Set a time limit for yourself when scoring a new draft. The point is **to give a judgment that can be reviewed in a retro**, not to write a paper.
+
+- **30 seconds per dimension** is the right pace. If a dimension makes you want to spend longer, you are rationalizing, not scoring
+- **Trust your first integer**. If you keep bouncing between 3 and 4, write 3 + a note. After 5 runs the rubric will tell you whether you are systematically low
+- **Do not look at anchors before scoring**. If you check "what did Stop expecting score" before scoring, you are already anchored. **Score blind first, compare after**
+
+---
+
+## Mapping to the `cheat-on-content` sub-skills
+
+This starter rubric is read by the following skills:
+- `/cheat-init` cold-start mode → copies this file to `rubric_notes.md` by default (if calibration mode is chosen and the mode decides the v2 formula is usable)
+- `/cheat-score` and `/cheat-predict` → read `rubric_notes.md` for the current formula
+- `/cheat-bump` → this starter is the "prior starting point" for a bump; after the bump it is replaced by the user's own fitted version

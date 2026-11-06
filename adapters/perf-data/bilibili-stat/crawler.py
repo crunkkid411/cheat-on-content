@@ -1,12 +1,12 @@
-"""B站视频数据 + 评论抓取（公开接口，无需登录、无需签名）。
+"""Bilibili video data + comment crawler (public APIs; no login, no signature).
 
-与 douyin-session / xhs-explore 不同：B站的视频统计与评论都是**公开数据**——
-`view` 接口不需要 wbi 签名，评论走 `x/v2/reply` 老接口（按热度）。因此本 adapter
-是纯 httpx，零登录、零浏览器，clone 下来即可用。
+Unlike douyin-session / xhs-explore: Bilibili's video statistics and comments are both **public data** —
+the `view` API needs no wbi signature, and comments use the older `x/v2/reply` API (sorted by popularity).
+So this adapter is pure httpx, zero login, zero browser; clone it and it works.
 
-接口：
-- 视频数据：https://api.bilibili.com/x/web-interface/view?bvid=<BV号>
-- 评论：    https://api.bilibili.com/x/v2/reply?type=1&oid=<aid>&sort=2 （sort=2 热度）
+APIs:
+- Video data: https://api.bilibili.com/x/web-interface/view?bvid=<BV number>
+- Comments:   https://api.bilibili.com/x/v2/reply?type=1&oid=<aid>&sort=2 (sort=2 = popularity)
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ REPLY_API = "https://api.bilibili.com/x/v2/reply"
 
 
 def normalize_bvid(raw: str) -> str:
-    """从 BV 号或 B站视频 URL（含 b23.tv 短链跳转后）里提取 BV 号。"""
+    """Extract the BV number from a BV number or a Bilibili video URL (including after a b23.tv short-link redirect)."""
     m = re.search(r"(BV[0-9A-Za-z]{10})", raw or "")
     return m.group(1) if m else (raw or "").strip()
 
@@ -36,12 +36,12 @@ def _client() -> httpx.Client:
 
 
 def fetch_video(client: httpx.Client, bvid: str) -> dict:
-    """拉视频信息 + 统计。返回归一化后的 dict。"""
+    """Fetch video info + statistics. Returns a normalized dict."""
     resp = client.get(VIEW_API, params={"bvid": bvid})
     resp.raise_for_status()
     j = resp.json()
     if j.get("code") != 0:
-        raise RuntimeError(f"view 接口失败 code={j.get('code')} msg={j.get('message')}")
+        raise RuntimeError(f"view API failed code={j.get('code')} msg={j.get('message')}")
     d = j.get("data") or {}
     stat = d.get("stat") or {}
     return {
@@ -64,11 +64,11 @@ def fetch_video(client: httpx.Client, bvid: str) -> dict:
 
 
 def fetch_comments(client: httpx.Client, aid: int, max_count: int = 50) -> list[dict]:
-    """按热度（sort=2）翻页抓评论，最多 max_count 条。"""
+    """Page through comments by popularity (sort=2), up to max_count."""
     out: list[dict] = []
     seen: set[str] = set()
     pn = 1
-    for _ in range(60):  # 翻页上限保护
+    for _ in range(60):  # pagination upper-bound guard
         if len(out) >= max_count:
             break
         try:
@@ -77,10 +77,10 @@ def fetch_comments(client: httpx.Client, aid: int, max_count: int = 50) -> list[
                 params={"type": 1, "oid": aid, "sort": 2, "pn": pn, "ps": 20},
             ).json()
         except Exception as exc:
-            print(f"[警告] 评论请求异常（停止）：{exc}")
+            print(f"[warning] Comment request error (stopping): {exc}")
             break
         if j.get("code") != 0:
-            print(f"[警告] 评论接口 code={j.get('code')} msg={j.get('message')}（停止）")
+            print(f"[warning] Comment API code={j.get('code')} msg={j.get('message')} (stopping)")
             break
         reps = (j.get("data") or {}).get("replies") or []
         if not reps:
@@ -108,28 +108,29 @@ def _normalize_comment(c: dict) -> dict:
         "reply_comment_total": c.get("rcount") or 0,
         "create_time": c.get("ctime") or 0,
         "user_name": member.get("uname") or "",
+        # Bilibili's IP-location field is prefixed with "IP属地：" / "IP属地:" in the API payload; strip the prefix.
         "ip_label": loc.replace("IP属地：", "").replace("IP属地:", "").strip() if loc else "",
     }
 
 
 def fetch_all(bvid: str, max_comments: int = 50) -> dict:
-    """一次拉完视频数据 + 热门评论。"""
+    """Fetch video data + top comments in one go."""
     bvid = normalize_bvid(bvid)
     with _client() as client:
-        print(f"  → 拉取视频数据 {bvid}")
+        print(f"  -> Fetching video data {bvid}")
         video = fetch_video(client, bvid)
-        print(f"       ✓ {video['title'][:40]}（播放 {video['play_count']}）")
-        print("  → 拉取热门评论")
+        print(f"       OK {video['title'][:40]} (plays {video['play_count']})")
+        print("  -> Fetching top comments")
         if video.get("aid") is None:
-            print("[警告] 视频数据缺少 aid 字段，无法拉取评论")
+            print("[warning] Video data has no aid field; cannot fetch comments")
             comments = []
         else:
             comments = fetch_comments(client, video["aid"], max_count=max_comments)
-        print(f"       ✓ {len(comments)} 条评论")
+        print(f"       OK {len(comments)} comments")
     return {"video": video, "comments": comments}
 
 
 if __name__ == "__main__":
-    # 与 douyin-session / xhs-explore 的接口保持一致；B站公开数据无需登录。
+    # Keeps the same interface as douyin-session / xhs-explore; Bilibili public data needs no login.
     if len(sys.argv) > 1 and sys.argv[1] == "login":
-        print("[B站] 视频数据与评论均为公开接口，无需登录，直接 /cheat-retro 即可。")
+        print("[Bilibili] Video data and comments are public APIs; no login needed — just run /cheat-retro.")

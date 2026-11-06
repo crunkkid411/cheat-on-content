@@ -3,16 +3,16 @@
 # cheat-on-content / prediction-immutability hook
 #
 # Wires PreToolUse(Edit|Write) → blocks any edit that touches the
-# '## 预测' / '## Prediction' section of a file under predictions/.
+# '## Prediction' (legacy: '## 预测') section of a file under predictions/.
 #
 # Allows:
 #   - Writing brand-new prediction files
 #   - Editing the file's metadata header (above first ##)
-#   - Appending to the '## 复盘' / '## Retrospective' section
+#   - Appending to the '## Retrospective' (legacy: '## 复盘') section
 #   - Touching files outside predictions/
 #
 # Blocks:
-#   - Any change to lines between '## 预测' (or '## Prediction') and the next H2
+#   - Any change to lines between '## Prediction' (or '## 预测') and the next H2
 #
 # Bypass (rare, for true formatting-only fixes):
 #   CHEAT_BYPASS_IMMUTABILITY=1 — single-shot bypass; logs a warning to stderr
@@ -71,7 +71,7 @@ fi
 # For Edit — extract the old_string and new_string and check whether either touches
 # the prediction section.
 #
-# Strategy: compute the byte range of the '## 预测' (or '## Prediction') section
+# Strategy: compute the byte range of the '## Prediction' (or '## 预测') section
 # in the file BEFORE the edit, then check whether the old_string lies inside that
 # range. If yes — block.
 
@@ -81,11 +81,11 @@ if [[ "$tool_name" == "Edit" ]]; then
     exit 0
   fi
 
-  # Find prediction section bounds. Match '## 预测' / '## Prediction' / '## 预测 v1'
+  # Find prediction section bounds. Match '## Prediction' / '## 预测' / '## Prediction v1'
   # / '## 预测 v2' / etc. — all version-suffixed prediction headings count as prediction
   # sections and are locked together.
   #
-  # Section ends at the first NON-prediction '## ' heading (typically '## 复盘').
+  # Section ends at the first NON-prediction '## ' heading (typically '## Retrospective').
   prediction_section=$(awk '
     /^## / {
       if ($0 ~ /^## (预测|Prediction)([^a-zA-Z]|$)/) {
@@ -112,19 +112,19 @@ if [[ "$tool_name" == "Edit" ]]; then
   if grep -qF -- "$old_string" "$pred_tmp" 2>/dev/null; then
     cat >&2 <<EOF
 
-[cheat-on-content] 🚫 BLOCKED: edit targets the '## 预测' / '## Prediction' section of:
+[cheat-on-content] 🚫 BLOCKED: edit targets the '## Prediction' / '## 预测' section of:
   $file_path
 
 This violates principle #1 of cheat-on-content: predictions are immutable.
 Once written, the prediction section can never be modified — only the
-'## 复盘' / '## Retrospective' section can be appended to.
+'## Retrospective' / '## 复盘' section can be appended to.
 
 What to do instead:
   • If you want to redo the prediction with new info, create a NEW file:
       ${file_path%.md}_redo.md
     The original must be preserved.
   • If you noticed a factual mistake AFTER seeing data, document it in the
-    '## 复盘' section: "Correction: original probability X% should have been Y%".
+    '## Retrospective' section: "Correction: original probability X% should have been Y%".
   • If this is a pure markdown-formatting fix (no semantic change), you can
     bypass once with: CHEAT_BYPASS_IMMUTABILITY=1 (logs to stderr, visible in git).
 
@@ -143,7 +143,7 @@ if [[ "$tool_name" == "Write" && -f "$file_path" ]]; then
 [cheat-on-content] 🚫 BLOCKED: Write would overwrite an existing prediction file:
   $file_path
 
-Use Edit on the '## 复盘' section to append retrospective content.
+Use Edit on the '## Retrospective' section to append retrospective content.
 Use a new '_redo.md' file path to create a redo prediction.
 The original prediction file must be preserved verbatim.
 

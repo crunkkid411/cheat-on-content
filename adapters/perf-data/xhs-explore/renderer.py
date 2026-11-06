@@ -1,4 +1,4 @@
-"""把抓到的小红书数据渲染成 report.md（cheat-retro 读这个文件）。"""
+"""Render the fetched Xiaohongshu data into report.md (cheat-retro reads this file)."""
 from __future__ import annotations
 
 import datetime as dt
@@ -8,10 +8,10 @@ from pathlib import Path
 
 def _fmt_time(ts) -> str:
     if not ts:
-        return "未知"
+        return "unknown"
     try:
         ts = int(ts)
-        # 小红书部分接口用毫秒时间戳
+        # Some Xiaohongshu APIs use millisecond timestamps
         if ts > 1e12:
             ts //= 1000
         return dt.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
@@ -27,7 +27,7 @@ def _fmt_num(n) -> str:
     except (ValueError, TypeError):
         return str(n)
     if n >= 10000:
-        return f"{n/10000:.1f}w"
+        return f"{n/1000:.1f}k"
     return str(n)
 
 
@@ -42,64 +42,64 @@ def _ratio(num, denom) -> str:
 
 
 def _escape_md(text: str) -> str:
-    """轻度转义，避免正文里的 # 被误认为标题。"""
+    """Light escaping so a # in the body is not mistaken for a heading."""
     return text.replace("\n", "  \n").replace("#", "\\#")
 
 
 def render_report(note: dict, script: str, comments: list[dict]) -> str:
     lines: list[str] = []
-    title = note.get("title") or "(无标题)"
+    title = note.get("title") or "(untitled)"
     note_id = note["note_id"]
     view = note.get("view_count") or 0
 
     lines.append(f"# {title}")
     lines.append("")
-    lines.append(f"- 笔记 ID：`{note_id}`")
-    lines.append(f"- 发布时间：{note.get('post_time_str') or _fmt_time(note.get('create_time', 0))}")
-    lines.append(f"- 链接：https://www.xiaohongshu.com/explore/{note_id}")
-    lines.append(f"- 抓取时间：{dt.datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    lines.append(f"- Note ID: `{note_id}`")
+    lines.append(f"- Published at: {note.get('post_time_str') or _fmt_time(note.get('create_time', 0))}")
+    lines.append(f"- Link: https://www.xiaohongshu.com/explore/{note_id}")
+    lines.append(f"- Fetched at: {dt.datetime.now().strftime('%Y-%m-%d %H:%M')}")
     if note.get("ip_location"):
-        lines.append(f"- IP 归属：{note['ip_location']}")
+        lines.append(f"- IP location: {note['ip_location']}")
     lines.append("")
 
-    lines.append("## 数据快照")
+    lines.append("## Data snapshot")
     lines.append("")
-    lines.append(f"- 曝光/浏览：{_fmt_num(view)}")
-    lines.append(f"- 点赞：{_fmt_num(note.get('like_count'))}（赞曝比 {_ratio(note.get('like_count'), view)}）")
-    lines.append(f"- 收藏：{_fmt_num(note.get('collect_count'))}（藏曝比 {_ratio(note.get('collect_count'), view)}）")
-    lines.append(f"- 评论：{_fmt_num(note.get('comment_count'))}（评曝比 {_ratio(note.get('comment_count'), view)}）")
-    lines.append(f"- 分享：{_fmt_num(note.get('share_count'))}（分曝比 {_ratio(note.get('share_count'), view)}）")
+    lines.append(f"- Impressions/views: {_fmt_num(view)}")
+    lines.append(f"- Likes: {_fmt_num(note.get('like_count'))} (like-to-impression {_ratio(note.get('like_count'), view)})")
+    lines.append(f"- Saves: {_fmt_num(note.get('collect_count'))} (save-to-impression {_ratio(note.get('collect_count'), view)})")
+    lines.append(f"- Comments: {_fmt_num(note.get('comment_count'))} (comment-to-impression {_ratio(note.get('comment_count'), view)})")
+    lines.append(f"- Shares: {_fmt_num(note.get('share_count'))} (share-to-impression {_ratio(note.get('share_count'), view)})")
     if note.get("fans_inc"):
-        lines.append(f"- 涨粉：{_fmt_num(note.get('fans_inc'))}")
+        lines.append(f"- Follower gain: {_fmt_num(note.get('fans_inc'))}")
     lines.append("")
 
-    # 正文 + 标签（公开页兜底时才有）
+    # Body + tags (present only when the public-page fallback ran)
     body = note.get("body") or note.get("desc") or ""
     tags = note.get("tags") or []
     if body or tags:
-        lines.append("## 正文")
+        lines.append("## Body")
         lines.append("")
         if tags:
             lines.append(" ".join(f"#{t}" for t in tags))
             lines.append("")
-        lines.append(_escape_md(body) if body else "（无）")
+        lines.append(_escape_md(body) if body else "(none)")
         lines.append("")
 
-    # 图片（本地优先，否则用 URL）
+    # Images (local path preferred, otherwise URL)
     image_paths = note.get("image_paths") or []
     image_urls = note.get("images") or []
     images = image_paths or image_urls
     if images:
-        lines.append("## 图片")
+        lines.append("## Images")
         lines.append("")
         for i, img in enumerate(images, 1):
-            lines.append(f"![图片{i}]({img})")
+            lines.append(f"![image {i}]({img})")
         lines.append("")
 
-    # galaxy 原始 JSON——首跑时用来确认曝光字段的真实 key 名
+    # galaxy raw JSON — used on the first run to confirm the real key name for impressions
     raw = note.get("raw")
     if raw:
-        lines.append("### galaxy 原始字段（首跑校准用，确认曝光字段 key 后可忽略）")
+        lines.append("### galaxy raw fields (first-run calibration; ignore once the impressions key is confirmed)")
         lines.append("")
         lines.append("```json")
         full = json.dumps(raw, ensure_ascii=False, indent=2)
@@ -110,15 +110,15 @@ def render_report(note: dict, script: str, comments: list[dict]) -> str:
         lines.append("```")
         lines.append("")
 
-    lines.append("## 原始稿子")
+    lines.append("## Original script")
     lines.append("")
-    lines.append(script.strip() if script.strip() else "（未提供）")
+    lines.append(script.strip() if script.strip() else "(not provided)")
     lines.append("")
 
-    lines.append(f"## 评论（按点赞降序，共 {len(comments)} 条）")
+    lines.append(f"## Comments (sorted by likes descending; {len(comments)} total)")
     lines.append("")
     if not comments:
-        lines.append("（未抓到评论——可能 xsec_token 缺失、评论被关或需手动粘贴）")
+        lines.append("(No comments captured — xsec_token may be missing, comments may be closed, or manual paste may be needed)")
     else:
         for c in comments:
             reply = f" 💬{c['sub_comment_count']}" if c.get("sub_comment_count") else ""
@@ -137,6 +137,6 @@ def slugify(text: str, max_len: int = 30) -> str:
 
 
 def output_dir_for(note: dict, root: Path) -> Path:
-    date = (note.get("post_time_str") or _fmt_time(note.get("create_time", 0)))[:10].replace("未知", "nodate")
+    date = (note.get("post_time_str") or _fmt_time(note.get("create_time", 0)))[:10].replace("unknown", "nodate")
     slug = slugify(note.get("title") or note["note_id"])
     return root / f"{date}_{slug}"

@@ -1,66 +1,66 @@
-# adapters/trend-sources/trendradar-mcp — 综合社会热点（MCP）
+# adapters/trend-sources/trendradar-mcp — general social trends (MCP)
 
-**适合谁**：观点视频 / 时评 / 文化垂类 / 美食 / 职场 / 社会议题——**任何非 AI 垂直**的内容。
+**Who it suits**: opinion videos / current-events commentary / culture verticals / food / workplace / social issues — **any non-AI vertical** content.
 
 ---
 
-## 它是什么
+## What it is
 
-[TrendRadar](https://github.com/sansan0/TrendRadar) 是 57k stars 的中文热点聚合监控（用 newsnow API 拉微博 / 知乎 / 抖音 / B 站 / 头条 等多平台）。它自带独立的 MCP server `trendradar-mcp`，暴露 25+ 个 tool。
+[TrendRadar](https://github.com/sansan0/TrendRadar) is a 57k-star Chinese trend aggregation monitor (using the newsnow API to pull Weibo / Zhihu / Douyin / Bilibili / Toutiao and other platforms). It ships its own MCP server, `trendradar-mcp`, exposing 25+ tools.
 
-cheat-on-content 把它当作 trend-sources adapter 之一——用户配 MCP server 后，cheat-seed / cheat-trends 自然能调。
+cheat-on-content treats it as one of the trend-sources adapters — once the user configures the MCP server, cheat-seed / cheat-trends can call it naturally.
 
-- **多平台覆盖**：微博 / 知乎 / 抖音 / B站 / 头条 / 36kr / 等等
-- **AI 增强工具**：`analyze_topic_trend` 给爆火/衰退判定；`compare_periods` 给周环比；`analyze_sentiment` 给情感倾向
-- **License**：TrendRadar 本体是 GPL-3.0，但我们**只通过 MCP 协议调用**他们的 server，不构成 linking——无 GPL 传染
+- **Multi-platform coverage**: Weibo / Zhihu / Douyin / Bilibili / Toutiao / 36kr / etc.
+- **AI-enhanced tools**: `analyze_topic_trend` for breakout/decline judgment; `compare_periods` for week-over-week; `analyze_sentiment` for sentiment tendency
+- **License**: TrendRadar itself is GPL-3.0, but we **only call their server through the MCP protocol**, which does not constitute linking — no GPL contagion
 
-## 装
+## Install
 
-参考 TrendRadar 仓库的 [MCP 配置文档](https://github.com/sansan0/TrendRadar)。装好后用户的 Claude Code `.claude/settings.json` 含 `mcp__trendradar__*` 系列工具。
+Refer to the [MCP configuration docs](https://github.com/sansan0/TrendRadar) in the TrendRadar repo. Once installed, the user's Claude Code `.claude/settings.json` contains the `mcp__trendradar__*` tool family.
 
-cheat-on-content 不打包 TrendRadar——用户自己装、自己保管 server 资源。
+cheat-on-content does not bundle TrendRadar — users install it themselves and manage the server resources themselves.
 
-## cheat-seed / cheat-trends 调用的关键工具
+## Key tools called by cheat-seed / cheat-trends
 
-| MCP 工具 | 用途 | 在哪调 |
+| MCP tool | Purpose | Where it is called |
 |---|---|---|
-| `mcp__trendradar__get_latest_news` | 拿最新热榜（最直接） | cheat-seed Mode C 主调 / cheat-trends 主调 |
-| `mcp__trendradar__get_trending_topics` | 自动提取话题统计 | cheat-seed Mode C 备用 |
-| `mcp__trendradar__analyze_topic_trend` | 单话题趋势分析（爆火/衰退） | cheat-seed Mode A 灰色场景 enrich（用户提了具体话题且同意拉数据） |
-| `mcp__trendradar__compare_periods` | 周环比 / 月环比 | cheat-bump 升级 rubric 时作"用户领域是否变化"的弱信号（罕见用） |
-| `mcp__trendradar__search_news` | 关键词搜索 | cheat-seed Mode A 用户提了关键词时 |
+| `mcp__trendradar__get_latest_news` | Get the latest hot list (most direct) | cheat-seed Mode C primary / cheat-trends primary |
+| `mcp__trendradar__get_trending_topics` | Automatically extract topic statistics | cheat-seed Mode C backup |
+| `mcp__trendradar__analyze_topic_trend` | Single-topic trend analysis (breakout/decline) | cheat-seed Mode A gray-area enrichment (the user raised a concrete topic and agreed to pull data) |
+| `mcp__trendradar__compare_periods` | Week-over-week / month-over-month | A weak signal for "has the user's domain changed" during cheat-bump rubric upgrades (rarely used) |
+| `mcp__trendradar__search_news` | Keyword search | cheat-seed Mode A when the user gives a keyword |
 
-## 输出格式契约
+## Output format contract
 
-TrendRadar MCP 返回 JSON / markdown。cheat-seed 收到后：
+TrendRadar MCP returns JSON / markdown. After cheat-seed receives it:
 
-1. 解析 items（title / source / hot_score / snapshot_at / url）
-2. 按 [candidate-schema.md](../../shared-references/candidate-schema.md) 算稳定 id（`sha256(source + normalized_title + url_path)[:12]`）
-3. 去重（参考 cheat-trends 的去重协议）
-4. 用当前 rubric 粗筛
-5. 写入 `candidates.md`
+1. Parse items (title / source / hot_score / snapshot_at / url)
+2. Compute a stable id per [candidate-schema.md](../../shared-references/candidate-schema.md) (`sha256(source + normalized_title + url_path)[:12]`)
+3. Dedupe (per cheat-trends' dedupe protocol)
+4. Rough-filter with the current rubric
+5. Write into `candidates.md`
 
-## 失败模式
+## Failure modes
 
-| 症状 | 处理 |
+| Symptom | Handling |
 |---|---|
-| MCP server 没装 / 没启动 | cheat-seed 自动降级到下一个启用的源（如 aihot 或 manual-paste），不抛异常 |
-| MCP 调用超时 | 30 秒后超时，提示用户"trendradar 慢，要等还是切别的源" |
-| newsnow 上游 API 改了 | TrendRadar 维护者会修；用户跟着升级 |
+| MCP server not installed / not started | cheat-seed automatically degrades to the next enabled source (e.g. aihot or manual-paste) without throwing |
+| MCP call times out | Time out after 30 seconds; ask the user "trendradar is slow — wait or switch sources?" |
+| The newsnow upstream API changed | TrendRadar's maintainers fix it; users upgrade along |
 
-## 稳定性
+## Stability
 
-★★★★ — 取决于 TrendRadar 项目活跃度（57k stars，活跃）+ newsnow 上游稳定性。
+★★★★ — depends on the TrendRadar project's activity (57k stars, active) + newsnow upstream stability.
 
 ---
 
-## 与其他 adapter 的关系
+## Relationship to the other adapters
 
-- **vs aihot.md**：互补不重叠。trendradar 是综合社会，aihot 是 AI 垂直。两者都启用时按 `content_form` 路由（详见 [data-source-routing.md](../../shared-references/data-source-routing.md)）
-- **vs manual-paste**：永远的 fallback。两个 API 都失败时走 manual-paste
+- **vs aihot.md**: complementary, not overlapping. trendradar is general social; aihot is AI vertical. When both are enabled, route by `content_form` (see [data-source-routing.md](../../shared-references/data-source-routing.md))
+- **vs manual-paste**: the eternal fallback. When both APIs fail, go manual-paste
 
-## 给 TrendRadar 团队的话
+## A note to the TrendRadar team
 
-如果你是 TrendRadar 维护者看到这份 adapter doc——感谢你把多平台聚合做成 MCP server。cheat-on-content 是你们项目的"内容生产侧下游"——用户用 TrendRadar 知道发生了啥，用 cheat-on-content 把这个变成可校准的内容预测循环。互补不替代。
+If you are a TrendRadar maintainer reading this adapter doc — thank you for turning multi-platform aggregation into an MCP server. cheat-on-content is your project's "content-production-side downstream" — users use TrendRadar to know what happened, and use cheat-on-content to turn it into a calibratable content-prediction loop. Complementary, not a replacement.
 
-欢迎 cross-link：[github.com/XBuilderLAB/cheat-on-content](https://github.com/XBuilderLAB/cheat-on-content)。
+Cross-links welcome: [github.com/XBuilderLAB/cheat-on-content](https://github.com/XBuilderLAB/cheat-on-content).

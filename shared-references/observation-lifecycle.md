@@ -1,210 +1,210 @@
-# Observation Lifecycle（观察生命周期协议）
+# Observation Lifecycle
 
-被这些子 skill 引用：`cheat-retro`、`cheat-bump`、主 SKILL.md。
+Referenced by these sub-skills: `cheat-retro`, `cheat-bump`, and the main SKILL.md.
 
-这是项目原则 #3 的完整规范——**rubric 是工作台，不是博物馆**。任何对 `rubric_notes.md` 中观察条目的增删都必须遵循本协议。
+This is the full specification of project principle #3 — **the rubric is a workbench, not a museum**. Every addition or deletion of an observation entry in `rubric_notes.md` must follow this protocol.
 
 ---
 
-## 三个生命阶段
+## Three life stages
 
-每条观察都在下列状态之一：
+Every observation is in one of the following states:
 
 ```
-[新增]  →  [观察记录]  →  [跨视频观察]  →  [规律沉淀] / [被吸收为维度] / [被推翻]
-                                       ↘
-                                        [待验证假设]（暂存）
+[new]  →  [observation log]  →  [cross-video observation]  →  [settled rule] / [absorbed as a dimension] / [refuted]
+                                                            ↘
+                                                             [hypothesis to verify] (parking lot)
 ```
 
-| 阶段 | 在 rubric_notes.md 的位置 | 触发 |
+| Stage | Location in rubric_notes.md | Trigger |
 |---|---|---|
-| **观察记录** | `## 观察记录` 段 | 单次复盘后写入。每篇视频复盘对应一条 |
-| **跨视频观察** | `## 重大跨视频观察` 段 | 同一个 pattern 在 ≥2 个样本里出现 |
-| **规律沉淀** | `## 规律沉淀区（高置信度）` 段 | 已有 ≥2 样本支持且**通过升级验证流程**（即被吸收进维度或被显式确认） |
-| **待验证假设** | `## 待验证假设` 段 | 单样本观察暂存，等更多样本 |
+| **Observation log** | `## Observation log` section | Written after a single retro. One entry per video retro |
+| **Cross-video observation** | `## Major cross-video observations` section | The same pattern appears in ≥2 samples |
+| **Settled rule** | `## Settled rules (high confidence)` section | Already supported by ≥2 samples **and has passed the bump validation process** (i.e. absorbed into a dimension or explicitly confirmed) |
+| **Hypothesis to verify** | `## Hypotheses to verify` section | A single-sample observation parked until more samples arrive |
 
 ---
 
-## 升级到下一阶段的门槛（**Claude 判断为主，下面是参考默认**）
+## Thresholds for advancing to the next stage (**Claude judges; the following are reference defaults**)
 
-| 从 → 到 | 默认参考门槛 | Claude 判断信号强度（可软违反） |
+| From → To | Default reference threshold | Claude's signal-strength judgment (may soft-break) |
 |---|---|---|
-| 观察记录 → 跨视频观察 | 同 pattern ≥2 样本 | 1 样本 + 评论区 ≥2000 赞的强模因证据也可升 |
-| 跨视频观察 → 待验证假设 | 单样本 + 强信号但还没复现 | — |
-| 跨视频观察 → 规律沉淀 | ≥2 样本 + 不需要改公式 | 1 样本 + 强反例（≥3x 偏差）也可升（标 `**Single-sample, high-confidence**`） |
-| 跨视频观察 → 维度（不再单独存在） | ≥3 样本 + 通过 bump 流程被吸收 | 同 cheat-bump 的 READINESS_HEURISTIC |
-| 任意 → 删除 | 被新数据推翻 / 被吸收为维度 / 被沉淀为规律 | `cheat-bump` cleanup pass，或单独操作 |
+| Observation log → cross-video observation | Same pattern in ≥2 samples | 1 sample + strong meme evidence (≥2,000 likes in the comments) may also promote |
+| Cross-video observation → hypothesis to verify | Single sample + strong signal but not yet reproduced | — |
+| Cross-video observation → settled rule | ≥2 samples + no formula change needed | 1 sample + strong counterexample (≥3x miss) may also promote (label `**Single-sample, high-confidence**`) |
+| Cross-video observation → dimension (no longer stands alone) | ≥3 samples + absorbed through the bump process | Same as cheat-bump's READINESS_HEURISTIC |
+| Any → deleted | Refuted by new data / absorbed as a dimension / settled as a rule | `cheat-bump` cleanup pass, or a standalone operation |
 
-**核心原则**：样本数是**信号强度的代理指标**，不是信号本身。3 个清晰、可追溯到具体数据点的样本 > 10 个零碎、低置信度的样本。
+**Core principle**: sample count is a **proxy for signal strength**, not the signal itself. 3 clear samples traceable to specific data points > 10 fragmentary, low-confidence samples.
 
-**Claude 软违反的纪律**：
-- 标注 `**Promoted with N samples (default expects M)**: <为什么仍然成立>`，让用户审视
-- 不连环软违反——如果 Claude 在最近 3 次升格里有 2 次以上软违反，cheat-status 提示"你的观察升格判断可能太激进，建议回到默认门槛 review"
+**Discipline when Claude soft-breaks**:
+- Label `**Promoted with N samples (default expects M)**: <why it still holds>` so the user can inspect it
+- Do not soft-break repeatedly — if Claude soft-breaks 2+ times in the last 3 promotions, cheat-status warns "your observation-promotion judgment may be too aggressive; consider returning to the default thresholds for review"
 
-### Sample size → 允许的动作（细化分级）
+### Sample size → permitted actions (detailed tiers)
 
-按校准池**总样本数**决定能做什么改动——粗暴改大动作需要更多证据：
+The calibration pool's **total sample count** determines what changes are allowed — bigger structural changes need more evidence:
 
-| 校准池规模 | 允许的动作 | 备注 |
+| Calibration pool size | Permitted actions | Notes |
 |---|---|---|
-| **1 个** | 记录"单次观察" | 单点不能触发任何规则改动，只能作为种子 |
-| **2-4 个** | 提炼"候选规律" + 升级到"跨视频观察"段 | 仍不能改公式 |
-| **5-9 个** | 修正维度定义（**定性变更**——如把 SR=5 的门槛说更严）| 不动权重数值，只改判断习惯。**第一次正式 bump 也在这一档**（rubric 形态首次成型） |
-| **10-19 个** | 微调权重 ±0.2（**定量变更**）| 如 ER ×1.5 → ×1.7；新增 / 删除维度仍属"定性大动作"，需要更多样本 |
-| **20+ 个** | 用回归反推权重（**数据驱动**）| Spearman correlation 之类，可作为 bump 依据 |
+| **1** | Record a "single observation" | A single point cannot trigger any rule change; it is only a seed |
+| **2-4** | Extract "candidate rules" + promote to the "cross-video observations" section | Still cannot change the formula |
+| **5-9** | Revise dimension definitions (**qualitative change** — e.g. make the SR=5 threshold stricter) | Do not touch weight values; only change judgment habits. **The first formal bump also happens in this tier** (the rubric takes shape for the first time) |
+| **10-19** | Fine-tune weights by ±0.2 (**quantitative change**) | e.g. ER ×1.5 → ×1.7; adding / removing dimensions is still a "qualitative structural change" and needs more samples |
+| **20+** | Back out weights with regression (**data-driven**) | Spearman correlation etc.; usable as bump evidence |
 
-**关键纪律**：
-- 不要在 N=5 时就用回归——5 个点拟合 7 维公式必过拟合
-- 不要在 N=20 时还用直觉调权重——已经有数据信号了
-- bump 协议（`bump-validation-protocol.md`）的 `MIN_SAMPLES_FOR_BUMP=5` 是**形态首次成型**的最低门槛，不是"开始数据驱动"的门槛——后者要 N≥20
-
----
-
-## 删除规则（最容易做错的部分）
-
-**两类条目必须删，不能保留**：
-
-### 类型 A：被吸收为维度的观察
-
-例：v2.1 升级时，"观察 E（致谢段二创量级是 ER=5 的最强外部证据）"被吸收为新维度 **MS（Memetic Shareability）**。
-
-→ 升级落地后，**删除**"观察 E"这条观察记录。维度 MS 本身就是新归宿。
-
-**理由**：保留观察 = 同一概念在文件里出现两次（一次作为维度，一次作为观察）。读者会困惑：这是历史还是仍生效的规则？
-
-### 类型 B：被新数据推翻的观察
-
-例：观察 X 提议"长视频天花板低"，后来 4 个长视频样本都破 50w → 推翻。
-
-→ **删除**这条观察。
-
-**理由**：保留 = 让未来的你或其他读者基于错误规则打分。
+**Key discipline**:
+- Do not use regression at N=5 — fitting a 7-dimension formula on 5 points will overfit
+- Do not keep tuning weights by intuition at N=20 — there is already data signal
+- The bump protocol's `MIN_SAMPLES_FOR_BUMP=5` is the minimum threshold for **the rubric taking shape for the first time**, not the threshold for "starting to be data-driven" — the latter requires N≥20
 
 ---
 
-## 必须保留的条目
+## Deletion rules (the part most often done wrong)
 
-下列条目**不删**，留在原处或迁移到合适段：
+**Two kinds of entries must be deleted, never kept**:
 
-- **未解决的观察**（既未被吸收也未被推翻）→ 跨升级时迁移到新版本的"待验证假设"段
-- **历史校准事件**（如"v1 → v2 升级是因为房价 259w 严重低估"）→ 保留在版本日志的"升级 Memo"段，**不**保留在观察段
-- **本版本仍生效的规律**（已沉淀到"规律沉淀区"）→ 保留
+### Type A: observations absorbed as dimensions
+
+Example: during the v2.1 bump, "Observation E (the amount of remix on the acknowledgment section is the strongest external evidence for ER=5)" was absorbed as the new dimension **MS (Memetic Shareability)**.
+
+→ After the bump lands, **delete** the "Observation E" log entry. The MS dimension is its new home.
+
+**Reason**: keeping the observation means the same concept appears twice in the file (once as a dimension, once as an observation). The reader will be confused: is this history or a currently active rule?
+
+### Type B: observations refuted by new data
+
+Example: Observation X proposed "long videos have a low ceiling"; later 4 long-video samples all broke 500k → refuted.
+
+→ **Delete** that observation.
+
+**Reason**: keeping it means your future self or other readers will score based on a wrong rule.
 
 ---
 
-## 不允许的反模式（**必须拒绝**）
+## Entries that must be kept
 
-下列模式都是"博物馆冲动"——把 rubric_notes.md 当历史档案：
+The following entries are **not deleted**; leave them in place or migrate them to the appropriate section:
 
-| 反模式 | 为什么不行 |
+- **Unresolved observations** (neither absorbed nor refuted) → migrate to the new version's "hypotheses to verify" section on the next bump
+- **Historical calibration events** (e.g. "v1 → v2 happened because Housing prices at 2.59M was severely underestimated") → keep in the "bump memo" section of the version log, **not** in the observation section
+- **Rules still active in the current version** (already settled in "settled rules") → keep
+
+---
+
+## Disallowed anti-patterns (**must refuse**)
+
+The following patterns are all "museum impulses" — treating rubric_notes.md as a historical archive:
+
+| Anti-pattern | Why it is wrong |
 |---|---|
-| `~~ER 权重 1.5~~` `**改为 2.0**`（带删除线的旧值） | 用 git history 看旧值，不要在文件里堆 |
-| "我曾经以为 SR 重要，但其实..." | 这种考古条目让读者读完不知道当下规则是什么 |
-| "v1 时代 NA 是关键，v2 后发现不是" | 同上。删掉 NA 相关条目，留版本 memo 解释为什么 NA 被砍 |
-| "保留这条观察作为反例" | 反例的位置是版本 memo 的"被推翻假设"小节，不是观察段 |
-| "下个 bump 再删，先放着" | 拒绝。bump 落地的同一次操作里删干净 |
+| `~~ER weight 1.5~~` `**changed to 2.0**` (old value with strikethrough) | Use git history to see old values; do not pile them up in the file |
+| "I once thought SR mattered, but actually..." | This kind of archaeology entry leaves the reader unsure what the current rule is after reading |
+| "NA was key in the v1 era; after v2 we found it wasn't" | Same as above. Delete NA-related entries; leave the version memo to explain why NA was cut |
+| "Keep this observation as a counterexample" | Counterexamples belong in the version memo's "refuted hypotheses" subsection, not the observation section |
+| "I'll delete it in the next bump, leave it for now" | Refuse. Delete it cleanly in the same operation that lands the bump |
 
-git history 才是真正的归档。`rubric_notes.md` 是当前生效规则的快照——读者打开它应该看到**今天该怎么打分**，而不是过去几个月的演化史。
+Git history is the real archive. `rubric_notes.md` is a snapshot of the currently active rules — a reader opening it should see **how to score today**, not the evolution history of the past few months.
 
 ---
 
-## Blind channel leak guard（**任何 skill 写 rubric_notes.md 时必须遵守**）
+## Blind channel leak guard (**every skill must follow this when writing rubric_notes.md**)
 
-`rubric_notes.md` 是 cheat-score-blind sub-agent（channel B）的**白名单**——sub-agent 读这个文件给 script 打分时，文件内容不能含**已发布作品的实绩数据**，否则 sub-agent 的"盲"被破坏。
+`rubric_notes.md` is the **whitelist** for the cheat-score-blind sub-agent (channel B) — when the sub-agent reads this file to score a script, the file content must not contain **actual-performance data from published pieces**, otherwise the sub-agent's "blindness" is broken.
 
-**禁止写入 rubric_notes.md 的 pattern**：
+**Patterns forbidden in rubric_notes.md**:
 
-| 模式 | 例子 | 替代位置 |
+| Pattern | Example | Alternative location |
 |---|---|---|
-| 真实视频标题 + 实绩 | "「停止期待」播放 71.1w" | rubric-memo.md |
-| 派生证据带命名锚 | "派生证据：「她不一样」MS=5 → 实绩 124.8w" | rubric-memo.md |
-| 校准池重打表 | bump 时的样本对照表 | rubric-memo.md |
-| 跨模型审核引用含数字 | "audit: 「老板废话」rank 一致 ✓" | rubric-memo.md |
-| 含 `\d+w` / `\d+万` / `\d+M` / `\d+k` 的数字（**除 bucket 边界**） | "实绩 13.7w" | rubric-memo.md |
+| Real video title + actual performance | "'Stop expecting' got 711k plays" | rubric-memo.md |
+| Derived evidence with named anchors | "Derived evidence: 'She's different' MS=5 → actual 1.248M" | rubric-memo.md |
+| Calibration-pool re-score table | The sample comparison table from a bump | rubric-memo.md |
+| Cross-model audit quotes containing numbers | "audit: 'Boss nonsense' rank consistent ✓" | rubric-memo.md |
+| Numbers matching `\d+w` / `\d+万` / `\d+M` / `\d+k` (**except bucket boundaries**) | "actual 137k" | rubric-memo.md |
 
-**允许的 pattern**（通用语言）：
+**Allowed patterns** (generic language):
 
-- 公式：`(ER×2.0 + HP×1.5 + ...) / N × M`
-- 维度定义：`ER（情感共鸣）：0=无情绪 / 3=中等共鸣 / 5=极端共鸣`
-- 派生证据**抽象化**：`派生证据：高抽象密度样本 → CC=1 → 低 reach`
-- Bucket 边界（数字属于规则不属于实绩）：`5-30w / 30-100w / 100-150w / >150w`
-- 观察 ID + 一句话：`观察 E：开头 5 秒含问句 → ER+`（不带样本名 / 不带实绩）
+- Formula: `(ER×2.0 + HP×1.5 + ...) / N × M`
+- Dimension definition: `ER (emotional resonance): 0 = no emotion / 3 = medium resonance / 5 = extreme resonance`
+- **Abstracted** derived evidence: `Derived evidence: high-abstraction-density sample → CC=1 → low reach`
+- Bucket boundaries (numbers belong to the rules, not to actual performance): `5-30w / 30-100w / 100-150w / >150w`
+- Observation ID + one line: `Observation E: a question in the first 5 seconds → ER+` (no sample name / no actual performance)
 
-**强制 cheat-bump Phase 5 末尾自检**：写完 rubric_notes.md 后跑 `grep -E '\\d+\\s*[wWmMkK万]|播放|实绩|实际'` → 命中 → abort + 回滚。这是硬约束。
+**mandatory cheat-bump Phase 5 self-check**: after writing rubric_notes.md, run `grep -E '\\d+\\s*[wWmMkK万]|播放|实绩|实际|plays|actual'` → any hit → abort + roll back. This is a hard constraint. (The Chinese terms are kept so legacy Chinese notes are still caught.)
 
-历史背景：PR #11 引入 cheat-score-blind 时漏算了这条——cheat-bump 把 Memo 写进 rubric_notes.md，sub-agent 通过白名单读到实绩。PR #12 修复（拆 file）+ 加本段约束防止将来再犯。
-
----
-
-## cleanup pass 的强制时机
-
-`cleanup pass` = 把所有满足"可删除"条件的观察一次性清掉。
-
-强制触发：
-- **bump 落地的最后一步**（见 `bump-validation-protocol.md` Step 5）
-- 用户显式触发"清算"操作（罕见）
-
-非强制但建议：
-- 校准池每加 5 个样本，主动审视"观察记录"段，看哪些已经可以升格 / 删除
-- `cheat-status` 看板检测到 `rubric_notes.md` 行数超过 500 时，建议清算
+Historical context: when PR #11 introduced cheat-score-blind, this was missed — cheat-bump wrote the memo into rubric_notes.md, and the sub-agent read actual performance through the whitelist. PR #12 fixed it (split the file) and added this section to prevent a repeat.
 
 ---
 
-## 行数预算
+## Mandatory timing of the cleanup pass
 
-健康 `rubric_notes.md` 的体积参考（目标）：
+`cleanup pass` = deleting in one pass every observation that satisfies a "deletable" condition.
 
-| 校准池规模 | 健康行数 | 警戒行数 |
+Mandatory triggers:
+- **The last step of landing a bump** (see `bump-validation-protocol.md` Step 5)
+- The user explicitly triggers a "cleanup" operation (rare)
+
+Non-mandatory but recommended:
+- Every 5 new calibration samples, proactively review the "observation log" section to see which entries can be promoted / deleted
+- When the `cheat-status` dashboard detects that `rubric_notes.md` exceeds 500 lines, recommend a cleanup
+
+---
+
+## Line budget
+
+Reference healthy size of `rubric_notes.md` (target):
+
+| Calibration pool size | Healthy line count | Warning line count |
 |---|---|---|
-| 0-5 篇 | 100-200 | >300 |
-| 5-20 篇 | 200-400 | >500 |
-| 20-50 篇 | 300-500 | >700 |
-| 50+ 篇 | 400-600 | >800 |
+| 0-5 pieces | 100-200 | >300 |
+| 5-20 pieces | 200-400 | >500 |
+| 20-50 pieces | 300-500 | >700 |
+| 50+ pieces | 400-600 | >800 |
 
-行数超警戒 → 必跑一次 cleanup pass。这不是为了好看，是为了**读者打分前能在 60 秒内读完核心规则**。
+Exceeding the warning line count → run a cleanup pass. This is not for looks; it is so **a reader can read the core rules in 60 seconds before scoring**.
 
 ---
 
-## 与"观察记录"模板的对齐
+## Alignment with the "observation log" template
 
-每条观察记录的标准模板（`rubric_notes.template.md` 也用这个）：
+The standard template for each observation entry (`rubric_notes.template.md` uses the same one):
 
 ```markdown
-### YYYY-MM-DD [标题简称] (id) — [一句话定性，如"验证 ER 主导"]
-- 预测：composite=X.XX，bucket=Y
-- 实绩：播放 / 点赞 / 评论 / 转发（带 T+Nd 标注）
-- Top 评论关键词：[简短摘录 + 赞数]
-- 判断：哪个维度被验证 / 推翻？为什么？
-- Rubric 调整：[如果有，写明 "下次打 XX 类文章时改 YY"]
-- 详见：[predictions/<file>.md]
+### YYYY-MM-DD [short title] (id) — [one-line assessment, e.g. "ER dominance validated"]
+- Prediction: composite=X.XX, bucket=Y
+- Actual: plays / likes / comments / shares (with T+Nd label)
+- Top comment keywords: [brief excerpt + like count]
+- Judgment: which dimension was validated / refuted? Why?
+- Rubric adjustment: [if any, state "next time scoring XX type of piece, change YY"]
+- See: [predictions/<file>.md]
 ```
 
-跨视频观察的模板：
+Template for cross-video observations:
 
 ```markdown
-### 观察 X — [一句话规律]
-**证据**：
-- 样本 1（composite, 实绩）：核心数据
-- 样本 2（composite, 实绩）：核心数据
-- 样本 3（composite, 实绩）：核心数据
+### Observation X — [one-line rule]
+**Evidence**:
+- Sample 1 (composite, actual): key data
+- Sample 2 (composite, actual): key data
+- Sample 3 (composite, actual): key data
 
-**假设**：[如果规律成立，意味着什么 rubric 调整]
+**Hypothesis**: [if the rule holds, what rubric adjustment it implies]
 
-样本数：N 个，[已超 / 待补]。
+Sample count: N, [met / pending].
 ```
 
 ---
 
-## 与 bump 协议的衔接
+## Interface with the bump protocol
 
-`cheat-bump` 在 Step 5（cleanup pass）必须按以下顺序处理观察段：
+In Step 5 (cleanup pass), `cheat-bump` must process the observation sections in this order:
 
-1. 列出所有 `## 观察记录` 段条目
-2. 对每条问 3 个问题：
-   - 它是否被本次 bump 吸收为正式维度？→ 删
-   - 它是否被本次 bump 的新数据推翻？→ 删
-   - 它是否仍未解决？→ 迁移到"待验证假设"段
-3. 列出所有 `## 重大跨视频观察` 段条目
-4. 对每条问相同 3 个问题
-5. 把"已被验证但不需改公式"的规律 → 迁移到"规律沉淀区"
-6. 最后**重新阅读** `rubric_notes.md` 全文，确保读者打开能在 60 秒内理解当下打分规则
+1. List every entry in `## Observation log`
+2. Ask 3 questions of each entry:
+   - Was it absorbed as a formal dimension by this bump? → delete
+   - Was it refuted by this bump's new data? → delete
+   - Is it still unresolved? → migrate to "hypotheses to verify"
+3. List every entry in `## Major cross-video observations`
+4. Ask the same 3 questions of each entry
+5. Move rules that are "validated but do not require a formula change" → "settled rules"
+6. Finally, **re-read** the whole `rubric_notes.md` to ensure a reader can understand the current scoring rules in 60 seconds

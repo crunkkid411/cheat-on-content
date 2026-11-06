@@ -5,8 +5,8 @@
 # Symlinks the 15 sub-skills into Claude Code and/or Codex skill directories so
 # agents can find them globally. Re-runnable safely (overwrite after confirmation).
 #
-# After install, in any content project directory: open Claude Code → say "初始化"
-# → /cheat-init runs the onboarding.
+# After install, in any content project directory: open Claude Code → say "initialize"
+# (the Chinese alias "初始化" also works) → /cheat-init runs the onboarding.
 #
 # To uninstall: bash uninstall.sh
 #
@@ -248,8 +248,8 @@ echo ""
 echo "  2. Open Claude Code or Codex in that directory"
 echo ""
 echo "  3. In the chat, say:"
-echo "       初始化"
-echo "       (or: 初始化 cheat-on-content)"
+echo "       initialize"
+echo "       (or: initialize cheat-on-content / 初始化 cheat-on-content)"
 echo ""
 if [[ "$TARGET_AGENT" == "claude" || "$TARGET_AGENT" == "all" ]]; then
   echo "Verify Claude install: ls -la ~/.claude/skills/ | grep cheat"

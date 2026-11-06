@@ -7,12 +7,12 @@
 <p align="center">
   <strong>English</strong>
   &nbsp;·&nbsp;
-  <a href="docs/README_CN.md"><strong>简体中文</strong></a>
+  <a href="docs/README_CN.md"><strong>Chinese edition (translated into English)</strong></a>
 </p>
 
 <p align="center">
   <a href="https://watcha.cn/products/cheat-on-content">
-    <img src="docs/guancha-no1.svg" alt="Watcha Hot List · 观猹热榜 · #1" width="328">
+    <img src="docs/guancha-no1.svg" alt="Watcha Hot List · #1" width="328">
   </a>
 </p>
 
@@ -135,7 +135,7 @@ bash install.sh
 In your content project directory, open a skill-compatible agent and say:
 
 ```
-初始化 cheat-on-content
+initialize cheat-on-content
 ```
 
 (or `init cheat-on-content`)

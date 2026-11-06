@@ -1,4 +1,4 @@
-"""把抓到的 LinkedIn 单帖分析渲染成 NotebookLM 友好的 Markdown（与 douyin-session 同形）。"""
+"""Render the fetched LinkedIn single-post analytics into NotebookLM-friendly Markdown (same shape as douyin-session)."""
 from __future__ import annotations
 
 import datetime as dt
@@ -12,7 +12,7 @@ def _fmt_num(n: int | None) -> str:
 
 
 def _ratio(num: int | None, den: int | None) -> str:
-    """派生比率，分母为 0 / 缺失时显示 '-'。"""
+    """Derived ratio; shows '-' when the denominator is 0 / missing."""
     if not num or not den:
         return "-"
     return f"{num / den * 100:.2f}%"
@@ -29,69 +29,69 @@ def render_report(post: dict, script: str) -> str:
     reposts = metrics.get("reposts")
 
     author = meta.get("author") or ""
-    title = author and f"{author} 的 LinkedIn 帖子" or f"LinkedIn 帖子 {activity_id}"
+    title = author and f"{author}'s LinkedIn post" or f"LinkedIn post {activity_id}"
 
     lines: list[str] = []
     lines.append(f"# {title}")
     lines.append("")
-    lines.append(f"- 帖子 activity_id：`{activity_id}`")
+    lines.append(f"- Post activity_id: `{activity_id}`")
     if author:
-        lines.append(f"- 作者：{author}")
+        lines.append(f"- Author: {author}")
     if meta.get("age"):
-        lines.append(f"- 发布距今：{meta['age']}")
-    lines.append(f"- 链接：https://www.linkedin.com/feed/update/urn:li:activity:{activity_id}/")
-    lines.append(f"- 抓取时间：{dt.datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        lines.append(f"- Published: {meta['age']} ago")
+    lines.append(f"- Link: https://www.linkedin.com/feed/update/urn:li:activity:{activity_id}/")
+    lines.append(f"- Fetched at: {dt.datetime.now().strftime('%Y-%m-%d %H:%M')}")
     lines.append("")
 
-    lines.append("## 数据快照")
+    lines.append("## Data snapshot")
     lines.append("")
-    lines.append(f"- 展示（Impressions）：{_fmt_num(impressions)}")
-    lines.append(f"- 触达人数（Members reached）：{_fmt_num(metrics.get('reach'))}")
-    lines.append(f"- 社交互动（Social engagements）：{_fmt_num(metrics.get('social_engagement'))}")
-    lines.append(f"- 点赞 / 反应（Reactions）：{_fmt_num(reactions)}")
-    lines.append(f"- 评论（Comments）：{_fmt_num(comments)}")
-    lines.append(f"- 转发（Reposts）：{_fmt_num(reposts)}")
-    lines.append(f"- 收藏（Saves）：{_fmt_num(metrics.get('saves'))}")
-    lines.append(f"- 私信转发（Sends）：{_fmt_num(metrics.get('sends'))}")
-    lines.append(f"- 帖子带来的主页访问（Profile viewers from post）：{_fmt_num(metrics.get('profile_views_from_post'))}")
-    lines.append(f"- 帖子带来的新增关注（Followers from post）：{_fmt_num(metrics.get('followers_from_post'))}")
+    lines.append(f"- Impressions: {_fmt_num(impressions)}")
+    lines.append(f"- Members reached: {_fmt_num(metrics.get('reach'))}")
+    lines.append(f"- Social engagements: {_fmt_num(metrics.get('social_engagement'))}")
+    lines.append(f"- Reactions: {_fmt_num(reactions)}")
+    lines.append(f"- Comments: {_fmt_num(comments)}")
+    lines.append(f"- Reposts: {_fmt_num(reposts)}")
+    lines.append(f"- Saves: {_fmt_num(metrics.get('saves'))}")
+    lines.append(f"- Sends: {_fmt_num(metrics.get('sends'))}")
+    lines.append(f"- Profile viewers from post: {_fmt_num(metrics.get('profile_views_from_post'))}")
+    lines.append(f"- Followers from post: {_fmt_num(metrics.get('followers_from_post'))}")
     lines.append("")
-    lines.append("派生比率（相对展示数）：")
-    lines.append(f"- 反应率：{_ratio(reactions, impressions)}")
-    lines.append(f"- 评论率：{_ratio(comments, impressions)}")
-    lines.append(f"- 转发率：{_ratio(reposts, impressions)}")
-    lines.append(f"- 社交互动率：{_ratio(metrics.get('social_engagement'), impressions)}")
+    lines.append("Derived ratios (relative to impressions):")
+    lines.append(f"- Reaction rate: {_ratio(reactions, impressions)}")
+    lines.append(f"- Comment rate: {_ratio(comments, impressions)}")
+    lines.append(f"- Repost rate: {_ratio(reposts, impressions)}")
+    lines.append(f"- Social-engagement rate: {_ratio(metrics.get('social_engagement'), impressions)}")
     lines.append("")
 
-    lines.append("## 帖子正文")
+    lines.append("## Post body")
     lines.append("")
     body = (meta.get("text") or "").strip()
-    lines.append(body if body else "（未抓到正文——单帖分析页有时不含完整正文，可手动补）")
+    lines.append(body if body else "(body not captured — the single-post analytics page sometimes omits the full body; add it manually)")
     lines.append("")
 
-    lines.append("## 原始稿子")
+    lines.append("## Original script")
     lines.append("")
-    lines.append(script.strip() if script.strip() else "（未提供）")
+    lines.append(script.strip() if script.strip() else "(not provided)")
     lines.append("")
 
-    lines.append("## 评论")
+    lines.append("## Comments")
     lines.append("")
     if comments:
         lines.append(
-            f"LinkedIn 单帖分析页只给评论**数**（{comments} 条），不含评论正文。"
+            f"The LinkedIn single-post analytics page gives only the comment **count** ({comments}), not comment text."
         )
         lines.append(
-            "评论文本是真信号——建议手动把 top 评论粘到这一节，供复盘分析。"
+            "Comment text is the real signal — paste the top comments into this section manually for retrospective analysis."
         )
     else:
-        lines.append("（没有评论，或未抓到评论数）")
+        lines.append("(No comments, or the comment count was not captured)")
     lines.append("")
 
     return "\n".join(lines)
 
 
 def slugify(text: str, max_len: int = 30) -> str:
-    """生成文件夹友好的短标题。"""
+    """Generate a folder-friendly short title."""
     bad = '<>:"/\\|?*\n\r\t'
     out = "".join("_" if ch in bad else ch for ch in text).strip()
     return out[:max_len] or "untitled"

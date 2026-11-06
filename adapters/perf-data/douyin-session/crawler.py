@@ -1,7 +1,7 @@
-"""抖音创作者中心 + 前台评论抓取。
+"""Douyin creator center + frontend comment crawling.
 
-登录一次后，Cookie 持久化在 .auth/，之后直接复用。
-一次抓取共享一个 Chromium 会话，稳定性优于每步一个进程。
+After logging in once, the cookie is persisted in .auth/ and reused directly afterwards.
+A single crawl shares one Chromium session, which is more stable than one process per step.
 """
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ CREATOR_CONTENT = "https://creator.douyin.com/creator-micro/content/manage"
 
 
 class Session:
-    """单浏览器会话，按顺序跑多步抓取。"""
+    """Single browser session that runs multiple crawl steps in order."""
 
     def __init__(self, ctx: BrowserContext, pw: Any) -> None:
         self.ctx = ctx
@@ -45,31 +45,31 @@ class Session:
 
 
 async def ensure_login(timeout_s: int = 300) -> bool:
-    """扫码登录；检测到 sessionid 后自动关闭。"""
+    """Scan the QR code to log in; close automatically once sessionid is detected."""
     sess = await Session.open()
     try:
         page = await sess.ctx.new_page()
         await page.goto(CREATOR_HOME)
-        print(f"[登录] 在弹出的 Chromium 窗口里扫码。最多等 {timeout_s} 秒……")
+        print(f"[login] Scan the QR code in the Chromium window. Waiting up to {timeout_s} seconds...")
         for i in range(timeout_s):
             try:
                 cookies = await sess.ctx.cookies("https://creator.douyin.com")
                 has_session = any(c["name"] in ("sessionid", "sessionid_ss") for c in cookies)
                 if has_session and "login" not in page.url:
-                    print(f"[登录] ✓ 检测到登录态（用时 {i}s）")
+                    print(f"[login] OK: login detected ({i}s)")
                     await asyncio.sleep(1)
                     return True
             except Exception:
                 pass
             await asyncio.sleep(1)
-        print("[登录] 超时未检测到登录态。")
+        print("[login] Timed out without detecting a login.")
         return False
     finally:
         await sess.close()
 
 
 async def fetch_recent_videos(sess: Session, limit: int = 50) -> list[dict]:
-    """从创作者中心拉最近视频列表。"""
+    """Pull the recent-video list from the creator center."""
     captured: list[dict] = []
     all_urls: list[str] = []
 
@@ -85,7 +85,7 @@ async def fetch_recent_videos(sess: Session, limit: int = 50) -> list[dict]:
                 data = await resp.json()
                 captured.append({"url": resp.url, "data": data})
                 if len(captured) == 1 and isinstance(data, dict):
-                    print(f"[诊断] 视频接口 keys: {list(data.keys())[:8]}")
+                    print(f"[diagnostic] video API keys: {list(data.keys())[:8]}")
             except Exception:
                 pass
 
@@ -93,7 +93,7 @@ async def fetch_recent_videos(sess: Session, limit: int = 50) -> list[dict]:
     try:
         await page.goto(CREATOR_CONTENT, wait_until="domcontentloaded", timeout=60000)
         await asyncio.sleep(8)
-        # 翻页加载更多
+        # Scroll to load more pages
         for _ in range(3):
             await page.evaluate("window.scrollBy(0, 1200)")
             await asyncio.sleep(1.5)
@@ -102,7 +102,7 @@ async def fetch_recent_videos(sess: Session, limit: int = 50) -> list[dict]:
             debug_path = debug_dir()
             debug_path.mkdir(parents=True, exist_ok=True)
             (debug_path / "creator_urls.txt").write_text("\n".join(all_urls), encoding="utf-8")
-            print(f"[诊断] 视频列表为空，{len(all_urls)} 个请求已 dump。")
+            print(f"[diagnostic] Video list empty; {len(all_urls)} requests dumped.")
         return videos
     finally:
         await page.close()
@@ -125,7 +125,7 @@ def _parse_video_list(captured: list[dict], limit: int) -> list[dict]:
                         break
         for v in candidates:
             videos.append(_normalize_video(v))
-    # 去重（按 aweme_id）
+    # Dedupe by aweme_id
     seen = set()
     dedup = []
     for v in videos:
@@ -165,7 +165,7 @@ def _normalize_video(v: dict) -> dict:
 
 
 async def fetch_video_detail(sess: Session, aweme_id: str) -> dict:
-    """视频数据分析页（完播、转粉等）。"""
+    """Video analytics page (completion, follow conversion, etc.)."""
     captured: list[dict] = []
     all_urls: list[str] = []
 
@@ -192,14 +192,14 @@ async def fetch_video_detail(sess: Session, aweme_id: str) -> dict:
             debug_path = debug_dir()
             debug_path.mkdir(parents=True, exist_ok=True)
             (debug_path / "detail_urls.txt").write_text("\n".join(all_urls), encoding="utf-8")
-            print("[诊断] 详细数据接口没拦到，已 dump URL 列表。")
+            print("[diagnostic] No detailed-data API intercepted; URL list dumped.")
         return {"captured": captured}
     finally:
         await page.close()
 
 
 async def fetch_comments_creator(sess: Session, aweme_id: str, max_pages: int = 60) -> list[dict]:
-    """走创作者中心『评论管理』页面。登录了创作者中心就能用，比前台稳定。"""
+    """Go through the creator center's "comment management" page. Works once logged in to the creator center, and is more stable than the frontend."""
     captured: list[dict] = []
     all_urls: list[str] = []
 
@@ -207,7 +207,7 @@ async def fetch_comments_creator(sess: Session, aweme_id: str, max_pages: int = 
 
     async def on_response(resp: Response) -> None:
         all_urls.append(resp.url)
-        # 创作者中心评论接口路径多变，宽松匹配
+        # The creator-center comment API path varies; match loosely
         if "comment" in resp.url and "creator" in resp.url:
             try:
                 data = await resp.json()
@@ -223,7 +223,7 @@ async def fetch_comments_creator(sess: Session, aweme_id: str, max_pages: int = 
 
     page.on("response", on_response)
     try:
-        # 多个候选页面，哪个能用就用哪个
+        # Multiple candidate pages; use whichever works
         urls_to_try = [
             f"https://creator.douyin.com/creator-micro/content/comment-manage?item_id={aweme_id}",
             f"https://creator.douyin.com/creator-micro/content/comment-manage",
@@ -234,10 +234,10 @@ async def fetch_comments_creator(sess: Session, aweme_id: str, max_pages: int = 
                 await asyncio.sleep(4)
                 break
             except Exception as e:
-                print(f"[警告] {u} 加载失败: {e}")
+                print(f"[warning] Failed to load {u}: {e}")
 
-        # 如果评论管理页面有 item_id 过滤，应该已经只显示这个视频的评论
-        # 滚动加载分页
+        # If the comment-management page supports item_id filtering, it should already show only this video's comments
+        # Scroll to load pages
         for i in range(max_pages):
             await page.evaluate("window.scrollBy(0, 1500)")
             await asyncio.sleep(1.5)
@@ -247,7 +247,7 @@ async def fetch_comments_creator(sess: Session, aweme_id: str, max_pages: int = 
         await page.screenshot(path=str(debug_path / "creator_comment_page.png"))
         (debug_path / "creator_comment_urls.txt").write_text("\n".join(all_urls), encoding="utf-8")
 
-        # 解析：抽取所有 data 里可能包含评论的结构
+        # Parse: extract every structure inside data that may contain comments
         comments: list[dict] = []
         for item in captured:
             data = item["data"]
@@ -258,7 +258,7 @@ async def fetch_comments_creator(sess: Session, aweme_id: str, max_pages: int = 
                         for c in val:
                             if isinstance(c, dict) and ("text" in c or "content" in c):
                                 comments.append(_normalize_comment_creator(c, aweme_id))
-        # 去重
+        # Dedupe
         seen = set()
         dedup = []
         for c in comments:
@@ -267,14 +267,14 @@ async def fetch_comments_creator(sess: Session, aweme_id: str, max_pages: int = 
             seen.add(c["cid"])
             dedup.append(c)
         dedup.sort(key=lambda x: x["digg_count"], reverse=True)
-        print(f"       创作者页共 {len(dedup)} 条评论")
+        print(f"       {len(dedup)} comments on the creator page in total")
         return dedup
     finally:
         await page.close()
 
 
 def _normalize_comment_creator(c: dict, default_aweme_id: str) -> dict:
-    """创作者中心评论字段（和前台不完全一样）。"""
+    """Creator-center comment fields (not exactly the same as the frontend)."""
     user = c.get("user") or c.get("user_info") or {}
     return {
         "cid": str(c.get("cid") or c.get("comment_id") or c.get("id") or ""),
@@ -289,7 +289,7 @@ def _normalize_comment_creator(c: dict, default_aweme_id: str) -> dict:
 
 
 async def fetch_comments(sess: Session, aweme_id: str, max_pages: int = 60) -> list[dict]:
-    """前台视频页 → 点击评论图标 → 滚动加载 → 拦截 comment/list XHR。"""
+    """Frontend video page -> click the comment icon -> scroll to load -> intercept comment/list XHR."""
     all_comments: list[dict] = []
     all_urls: list[str] = []
 
@@ -311,14 +311,14 @@ async def fetch_comments(sess: Session, aweme_id: str, max_pages: int = 60) -> l
         try:
             await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         except Exception as e:
-            print(f"[警告] 视频页加载异常：{e}")
+            print(f"[warning] Video page load error: {e}")
         await asyncio.sleep(6)
 
-        # 点击 "video-comment-more" 把评论展开（这是"展开评论区"按钮）
+        # Click "video-comment-more" to expand comments (this is the "expand comment area" button)
         for sel in ['[data-e2e="video-comment-more"]', '[data-e2e="feed-comment-icon"]']:
             try:
                 await page.locator(sel).first.click(force=True, timeout=3000)
-                print(f"       已点击 {sel}")
+                print(f"       clicked {sel}")
                 break
             except Exception:
                 pass
@@ -328,7 +328,7 @@ async def fetch_comments(sess: Session, aweme_id: str, max_pages: int = 60) -> l
         debug_path.mkdir(parents=True, exist_ok=True)
         await page.screenshot(path=str(debug_path / "comment_page.png"))
 
-        # 策略：把最后一条评论 scrollIntoView 触发 IntersectionObserver 懒加载
+        # Strategy: scroll the last comment into view to trigger IntersectionObserver lazy loading
         last_count = 0
         stagnant = 0
         i = 0
@@ -341,7 +341,7 @@ async def fetch_comments(sess: Session, aweme_id: str, max_pages: int = 60) -> l
                     if (items.length > 0) {
                         items[items.length - 1].scrollIntoView({block: 'end', behavior: 'instant'});
                     } else {
-                        // 评论容器还没渲染出 item，滚页面
+                        // The comment container has not rendered any item yet; scroll the page
                         window.scrollBy(0, 1500);
                     }
                 }"""
@@ -355,9 +355,9 @@ async def fetch_comments(sess: Session, aweme_id: str, max_pages: int = 60) -> l
             else:
                 stagnant = 0
                 last_count = cur
-        print(f"       滚动 {i+1} 次后退出，已累计 {last_count} 条")
+        print(f"       exited after {i+1} scrolls, {last_count} comments accumulated")
 
-        # 去重 + 排序
+        # Dedupe + sort
         seen = set()
         dedup = []
         for c in all_comments:
@@ -387,24 +387,24 @@ def _normalize_comment(c: dict) -> dict:
 
 
 async def fetch_all(aweme_id: str) -> dict:
-    """一个会话跑完视频列表 + 详细数据 + 评论。"""
+    """Run video list + detailed data + comments in one session."""
     sess = await Session.open()
     try:
-        print("  → 打开创作者中心，拉视频列表")
+        print("  -> Opening the creator center, pulling the video list")
         videos = await fetch_recent_videos(sess, limit=50)
         video = next((v for v in videos if v["aweme_id"] == aweme_id), None)
         if not video:
-            print(f"       未在最近 {len(videos)} 条里找到 {aweme_id}，用最小元数据继续。")
+            print(f"       {aweme_id} not found among the latest {len(videos)}; continuing with minimal metadata.")
             video = _normalize_video({"aweme_id": aweme_id})
         else:
-            print(f"       ✓ {video.get('desc', '')[:40]}")
+            print(f"       OK {video.get('desc', '')[:40]}")
 
-        print("  → 打开数据分析页")
+        print("  -> Opening the data analytics page")
         detail = await fetch_video_detail(sess, aweme_id)
 
-        print("  → 打开前台视频页抓评论")
+        print("  -> Opening the frontend video page to capture comments")
         comments = await fetch_comments(sess, aweme_id, max_pages=60)
-        print(f"       最终 {len(comments)} 条")
+        print(f"       {len(comments)} comments in total")
 
         return {"video": video, "detail": detail, "comments": comments}
     finally:

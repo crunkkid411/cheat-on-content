@@ -1,149 +1,149 @@
-# Migration Protocol（schema 演进哲学）
+# Migration Protocol (schema evolution philosophy)
 
-被 `cheat-migrate` skill / `cheat-init` / SessionStart hook / 维护者引用。规定如何安全演进 `.cheat-state.json` schema 而不让老用户被打断。
-
----
-
-## 核心原则
-
-1. **每个 release 必须能让老用户的旧 state 工作**——通过 migrate 升级，或通过 `state.get(field, default)` 兼容
-2. **MINOR 改动 = 加字段 / 软化 enum**；老 state 不跑 migrate 也能工作（字段缺失用默认值），跑了让 state 完整
-3. **MAJOR 改动 = 删字段 / 重命名 / 改语义**；老 state **必须**跑 migrate，否则 skill 读到不一致字段会出错
-4. **不允许跳版**；多版升级必须按顺序应用每个 step。每步幂等
-5. **失败停在原地**；不回滚，让用户在断点修复后继续
-6. **schema_version 是单调递增**；不允许降级（如需降级，cp 历史 git 快照）
+Referenced by the `cheat-migrate` skill / `cheat-init` / the SessionStart hook / maintainers. Defines how to safely evolve the `.cheat-state.json` schema without interrupting existing users.
 
 ---
 
-## 何时算 MINOR vs MAJOR
+## Core principles
 
-### MINOR 范围（不需要 migrate 也能跑老 state）
-
-- 新增字段（默认值定义良好，老 skill 不读它也不出错）
-- 软化 enum 取值（如 `"strict" / "lenient"` 加第三个 `"adaptive"`，老值仍合法）
-- 给字段加新可选取值（如某个 list 字段加新元素）
-- 改默认值（不改语义）
-
-### MAJOR 范围（必须跑 migrate）
-
-- **删除字段**——老 skill 仍写它，新 skill 不读它，会出歧义
-- **重命名字段**——老/新 skill 看不到对方写的
-- **改字段语义**（如 `mode` 从 enum 改为整数；`baseline_plays` 从 int 改为 list）
-- **改 enum 取值**（如 `"opinion-video"` 改成 `"opinion_video"`，老值不再合法）
-- **拆字段 / 合字段**
-
-> 模糊地带建议**保守判定为 MAJOR**——多写一份 migration 文件比让用户的 state 出错更好。
+1. **Every release must keep old users' state working** — either upgrade it through migrate, or stay compatible via `state.get(field, default)`
+2. **MINOR change = add a field / loosen an enum**; the old state works without running migrate (missing fields fall back to defaults), and running it makes the state complete
+3. **MAJOR change = delete a field / rename / change semantics**; the old state **must** run migrate, otherwise a skill reading inconsistent fields will break
+4. **Skipping versions is not allowed**; a multi-version upgrade must apply each step in order. Every step is idempotent
+5. **On failure, stop where you are**; do not roll back, let the user fix the breakpoint and continue
+6. **schema_version is monotonically increasing**; downgrades are not allowed (if you need one, `cp` a historical git snapshot)
 
 ---
 
-## 维护者 checklist：bump schema 时必做的 4 件事
+## When a change is MINOR vs MAJOR
 
-每次准备 release 时如果改了 state schema：
+### MINOR scope (old state still works without migrate)
 
-### 1. 改 cheat-init 写新 state 的硬编码 schema_version
+- Adding a field (with a well-defined default; old skills neither read it nor break)
+- Loosening an enum (e.g. `"strict" / "lenient"` gains a third `"adaptive"`; old values remain valid)
+- Adding a new optional value to a field (e.g. a new element in a list field)
+- Changing a default (without changing semantics)
+
+### MAJOR scope (migrate is mandatory)
+
+- **Deleting a field** — old skills still write it, new skills do not read it, which creates ambiguity
+- **Renaming a field** — old/new skills cannot see what the other wrote
+- **Changing field semantics** (e.g. `mode` from enum to integer; `baseline_plays` from int to list)
+- **Changing enum values** (e.g. `"opinion-video"` becomes `"opinion_video"`; old values are no longer valid)
+- **Splitting / merging fields**
+
+> In ambiguous cases, **conservatively judge it MAJOR** — writing one extra migration file is better than breaking the user's state.
+
+---
+
+## Maintainer checklist: 4 things you must do when bumping the schema
+
+Every time you prepare a release and have changed the state schema:
+
+### 1. Change the hardcoded schema_version that cheat-init writes into a new state
 
 ```diff
 - "schema_version": "1.1",
 + "schema_version": "1.2",
 ```
 
-位置：`skills/cheat-init/SKILL.md` Phase 3 的 state 写入段。
+Location: the state-writing section of `skills/cheat-init/SKILL.md` Phase 3.
 
-### 2. 改 migrations/registry.md 的 LATEST_SCHEMA 标记位
+### 2. Change the LATEST_SCHEMA marker in migrations/registry.md
 
 ```diff
 - LATEST_SCHEMA = "1.1"
 + LATEST_SCHEMA = "1.2"
 ```
 
-并在"版本链"表追加新行：
+And append a new row to the "version chain" table:
 
 ```
-| 1.1 | 1.2 | NO/YES | [1.1-to-1.2.md](1.1-to-1.2.md) | 一句话描述 |
+| 1.1 | 1.2 | NO/YES | [1.1-to-1.2.md](1.1-to-1.2.md) | One-line description |
 ```
 
-### 3. 写 migrations/<old>-to-<new>.md
+### 3. Write migrations/<old>-to-<new>.md
 
-4 段必填（参考 `1.0-to-1.1.md` 模板）：
+4 required sections (see the `1.0-to-1.1.md` template):
 - WHAT changed
 - WHY
 - HOW (Claude steps for /cheat-migrate)
 - Manual fallback
 
-> 写不出 4 段 = 改动太复杂没想清楚 = 不该 release 这次 schema bump。
+> If you cannot write all 4 sections, the change is too complicated and not thought through — this schema bump should not ship.
 
-### 4. CHANGELOG.md 标版本号 + 链接
+### 4. Tag the version number + link in CHANGELOG.md
 
 ```markdown
 ## [0.2.0] — YYYY-MM-DD
 
 ### BREAKING / MINOR
 
-- schema_version 1.1 → 1.2: <一句话描述>。迁移指南：[migrations/1.1-to-1.2.md](migrations/1.1-to-1.2.md)
+- schema_version 1.1 → 1.2: <one-line description>. Migration guide: [migrations/1.1-to-1.2.md](migrations/1.1-to-1.2.md)
 - ...
 ```
 
-MINOR 用 `### MINOR`，MAJOR 用 `### BREAKING`，要醒目。
+Use `### MINOR` for MINOR and `### BREAKING` for MAJOR, and make it prominent.
 
 ---
 
-## skill 内部怎么读 state（防御式编程）
+## How skills read state internally (defensive programming)
 
-每个 skill 读 state 时**必须**用 `state.get(field, default)` 模式：
+Every skill **must** use the `state.get(field, default)` pattern when reading state:
 
 ```python
-# 好
+# good
 target_cadence = state.get("target_publish_cadence_days", None)
 benchmark_status = state.get("benchmark_status", "none")
 shoots = state.get("shoots", [])
 
-# 坏（老 state 没这字段会 KeyError）
+# bad (KeyError when an old state lacks this field)
 target_cadence = state["target_publish_cadence_days"]
 ```
 
-理由：
-- MINOR 升级时老 state 缺新字段——`get` 模式让 skill 自动用默认值
-- 用户手改 state 删了字段——同上
-- 减少 skill 内"必须先迁移才能跑"的强依赖
+Reasons:
+- On a MINOR upgrade, the old state lacks new fields — the `get` pattern lets the skill fall back to defaults automatically
+- The user hand-edited the state and deleted a field — same as above
+- Reduces the hard dependency inside skills on "you must migrate before it runs"
 
-**例外**：核心标识字段允许直接索引（如 `state["schema_version"]`、`state["rubric_version"]`）——这些缺失意味着 state 文件根本不合法，应该明确报错。
+**Exception**: core identity fields may be indexed directly (e.g. `state["schema_version"]`, `state["rubric_version"]`) — when these are missing, the state file is fundamentally invalid and should error explicitly.
 
 ---
 
-## SessionStart hook 的角色
+## Role of the SessionStart hook
 
-hook 在每次会话开始时检测：
+The hook checks at the start of every session:
 
 ```bash
 state_schema=$(jq -r '.schema_version // "unknown"' "$STATE_FILE")
 if [[ "$state_schema" != "$LATEST_SCHEMA" ]]; then
-  echo "⚠️ schema 版本不一致：state=$state_schema, skill 期望=$LATEST_SCHEMA"
-  echo "   建议跑 /cheat-migrate 升级（不阻塞继续工作）"
+  echo "⚠️ schema version mismatch: state=$state_schema, skill expects=$LATEST_SCHEMA"
+  echo "   recommended: run /cheat-migrate to upgrade (does not block further work)"
 fi
 ```
 
-**非阻塞**：用户可以选择"先继续工作，回头再跑 migrate"。MINOR 不一致时大部分功能仍能跑；MAJOR 时部分 skill 可能报错——这时再跑 migrate 也来得及。
+**Non-blocking**: the user may choose to "keep working for now and run migrate later". With a MINOR mismatch most functionality still runs; with MAJOR some skills may error — running migrate then is still soon enough.
 
 ---
 
-## 给开发者：避免 schema 频繁 bump 的实践
+## For developers: practices that avoid frequent schema bumps
 
-不是每个改动都需要 schema bump。下面是哲学：
+Not every change needs a schema bump. The philosophy:
 
-- **优先 MINOR**：能加字段就加字段，少删字段。删字段让老用户不爽
-- **批量 bump**：积攒 3-5 个 MINOR 一起 release 比每次小改都 bump 要友好
-- **延迟 bump**：MINOR 字段如果 90% 用户用不到，**不**急着 bump schema——可以让该字段 `state.get(field, default)` 默默 work，等下次 release 顺路 bump
-- **避免 MAJOR**：能用 MINOR 解决的绝不上 MAJOR。例：与其重命名字段，不如保留旧字段 + 加新字段（旧的标 deprecated，下个 MAJOR release 才删）
+- **Prefer MINOR**: add fields when you can; delete fields rarely. Deleting fields upsets existing users
+- **Batch bumps**: accumulate 3-5 MINOR changes and release together instead of bumping on every small edit
+- **Delay bumps**: if 90% of users will never use a MINOR field, **do not** rush the schema bump — let the field quietly work through `state.get(field, default)` and bump on the next release
+- **Avoid MAJOR**: never use MAJOR when MINOR can solve it. E.g. instead of renaming a field, keep the old field + add a new one (mark the old one deprecated and delete it in the next MAJOR release)
 
 ---
 
-## 备份保留策略
+## Backup retention policy
 
-`/cheat-migrate` 写之前会备份到 `.cheat-state.json.backup-<timestamp>`。
+Before writing, `/cheat-migrate` backs up to `.cheat-state.json.backup-<timestamp>`.
 
-备份保留多久：
-- 用户跑 `/cheat-status` 时，如果有备份 + state 已稳定运行 N 天 → 提示"可以清理 N 个旧备份"
-- `/cheat-init` 重 init 时清理所有旧备份（既然要重 init，老备份意义不大）
-- 用户手动 `rm .cheat-state.json.backup-*` 永远 OK
+How long backups are kept:
+- When the user runs `/cheat-status`, if backups exist + the state has run stably for N days → suggest "you can clean up N old backups"
+- `/cheat-init` cleans all old backups when re-initializing (since you are re-initializing, old backups have little value)
+- The user manually running `rm .cheat-state.json.backup-*` is always OK
 
-不入版本控制：`.cheat-state.json.backup-*` 应在 `.gitignore` 里（已含 `.cheat-state.json` 通配规则）。
+Not version-controlled: `.cheat-state.json.backup-*` should be in `.gitignore` (the `.cheat-state.json` wildcard rule already covers it).

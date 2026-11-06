@@ -1,399 +1,399 @@
 ---
 name: cheat-learn-from
-description: 从对标账号导入 script + 数据 → 拆 pattern + 派生 base rubric 信号 → 写到 benchmark.md / script_patterns.md / rubric_notes.md。**这是工具最早期信号的来源**——cold-start 用户没自己历史时全靠对标，发过历史的用户也建议至少 1 个对标做 sanity check。触发词："学这个账号"/"拆这几个对标视频"/"learn from"/"导入对标账号"/"找对标"。
-argument-hint: <账号名> [— way: a (default) | b] [— append | --replace]
+description: Import scripts + data from a benchmark account → break down patterns + derive base rubric signals → write to benchmark.md / script_patterns.md / rubric_notes.md. **This is the tool's earliest source of signal** — cold-start users with no history rely entirely on the benchmark, and users with publishing history should still import at least 1 benchmark as a sanity check. Triggers: "学这个账号" / "拆这几个对标视频" / "learn from" / "导入对标账号" / "找对标".
+argument-hint: <account-name> [— way: a (default) | b] [— append | --replace]
 allowed-tools: Bash(*), Read, Write, Edit, Glob, WebFetch, Skill
 ---
 
-# /cheat-learn-from — 对标账号导入
+# /cheat-learn-from — benchmark account import
 
-工具早期最重要的信号源是**对标账号**——你 init 完没数据，rubric 等权 v0 等于占星。但如果你能找一个你想做成那样的账号，导入 5-10 条它的高/中/低样本，工具就有了 anchor。
+The tool's most important early signal source is a **benchmark account** — after init you have no data, and an equal-weight v0 rubric is astrology. But if you can find an account you want to become, and import 5-10 of its high / medium / low samples, the tool has anchors.
 
-后期当你自己 calibration_samples ≥ 10 时，benchmark 影响自然减弱——你的真实数据成为主要信号源。但 benchmark.md **不删**，仍是 cheat-seed brainstorm 的 reference frame。
+Later, once your own calibration_samples ≥ 10, the benchmark's influence fades naturally — your real data becomes the main signal source. But benchmark.md is **not deleted**; it remains a reference frame for cheat-seed brainstorming.
 
 ## Overview
 
 ```
-[用户：学这个账号 / 启动 cheat-learn-from]
+[User: learn from this account / start cheat-learn-from]
   ↓
-[Phase 0: 检查 benchmark 状态]
+[Phase 0: check benchmark status]
   ↓
-[Phase 1: 选 input 方式（Way a 默认）]
+[Phase 1: choose input method (Way a default)]
   ↓
-[Phase 2: 收集材料]
-  Way a: 用户粘 N 条 script 文本 + 数据
-  Way b: 用 whisper 转录 samples/ 目录里的视频
+[Phase 2: collect material]
+  Way a: user pastes N script texts + data
+  Way b: transcribe videos in the samples/ directory with whisper
   ↓
-[Phase 3: 询问每条样本的"印象判断"（高/中/低 + 为啥）]
+[Phase 3: ask for each sample's "impression judgment" (high/medium/low + why)]
   ↓
-[Phase 4: Claude 拆 pattern + 派生 rubric 信号]
+[Phase 4: Claude breaks down patterns + derives rubric signals]
   ↓
-[Phase 5: 用户 review → 改 → 落盘]
+[Phase 5: user review → revise → persist]
   ↓
-[Phase 6: 写 benchmark.md / script_patterns.md / rubric_notes.md]
+[Phase 6: write benchmark.md / script_patterns.md / rubric_notes.md]
   ↓
-[Phase 7: 更新 state.benchmark_status]
+[Phase 7: update state.benchmark_status]
 ```
 
 ## Constants
 
-- **MIN_SAMPLES = 3** — 最少 3 条样本（少于拆不出 pattern）
-- **RECOMMENDED_SAMPLES = 5-10** — 推荐区间，平衡信号量 vs 用户工作量
-- **MAX_SAMPLES_PER_RUN = 15** — 单次导入上限——再多 Claude context 不够 + 用户也累
-- **DEFAULT_WAY = a** — Way a 简单 + 准确，是 default
+- **MIN_SAMPLES = 3** — at least 3 samples (fewer yields no patterns)
+- **RECOMMENDED_SAMPLES = 5-10** — recommended range, balancing signal volume against user effort
+- **MAX_SAMPLES_PER_RUN = 15** — per-import cap; beyond that Claude's context runs out and the user gets tired
+- **DEFAULT_WAY = a** — Way a is simple + accurate, and is the default
 
 ## Inputs
 
-| 必填 | 来源 |
+| Required | Source |
 |---|---|
-| `<账号名>` | 用户参数；缺失则询问 |
-| `.cheat-state.json` | 状态文件 |
-| Way a: 用户粘的 script 文本 + 数据 | 对话 |
-| Way b: `samples/<账号名>/*.mp4` 等视频文件 | 用户提前下载好放进去 |
+| `<account-name>` | user argument; ask if missing |
+| `.cheat-state.json` | state file |
+| Way a: user-pasted script text + data | conversation |
+| Way b: `samples/<account-name>/*.mp4` and other video files | the user downloads them in advance |
 
 ## Workflow
 
-### Phase 0: 检查 benchmark 状态
+### Phase 0: Check benchmark status
 
-读 `.cheat-state.json` 的 `benchmark_status`：
+Read `benchmark_status` in `.cheat-state.json`:
 
-| 状态 | 处理 |
+| Status | Handling |
 |---|---|
-| `none` | 首次导入——继续 Phase 1 |
-| `pending` | 用户之前答应等下找——继续 Phase 1 |
-| `imported` 已有 benchmark | 询问"你已有 benchmark [当前名]，N 条样本。要做什么？  a) 追加新视频到当前 benchmark  b) 替换为新 benchmark  c) 只看不改" |
+| `none` | First import — continue to Phase 1 |
+| `pending` | The user previously said they would find one later — continue to Phase 1 |
+| `imported` with an existing benchmark | Ask "you already have benchmark [current name] with N samples. What do you want to do?  a) append new videos to the current benchmark  b) replace it with a new benchmark  c) just look, don't change" |
 
-参数解析：
-- `--append` → 追加到现有 benchmark
-- `--replace <new-name>` → 用新 benchmark 替换（旧的归档到 benchmark.archived/）
-- 没标志 + 已有 benchmark → 走上面询问
+Argument parsing:
+- `--append` → append to the existing benchmark
+- `--replace <new-name>` → replace with a new benchmark (archive the old one to benchmark.archived/)
+- No flag + an existing benchmark → run the question above
 
-### Phase 1: 选 input 方式（**两个独立维度**）
+### Phase 1: Choose the input method (**two independent dimensions**)
 
-每条样本 = **script** + **数据**。两者怎么拿是独立的——你可以混搭。
+Each sample = **script** + **data**. How you get each is independent — you can mix and match.
 
-#### Phase 1a: script source（怎么拿稿子）
-
-```
-script 怎么拿？
-
-a) **粘文本（最简单，推荐）**
-   - 你自己整理过 / 用工具提取过——直接粘进对话
-   - 工具推荐（按方便程度排）：
-   
-     抖音 / 小红书：
-     - 微信小程序「轻抖」—— 粘视频链接 → 自动提取文案 + 评论。最快
-     - 类似工具："视频解析助手" / "短视频文案提取" 等小程序
-     - 通常有免费额度，重度使用收费
-     
-     B 站 / YouTube：
-     - 视频页面有"显示字幕/文字记录"按钮（如果 UP 主开了）
-     - 第三方：DownSub / SaveSubs / yt-dlp --write-auto-sub
-     
-     公众号 / Substack：
-     - 直接复制网页文字
-   
-b) **whisper 转录视频文件**
-   - 你下载了视频到 samples/<账号名>/<video>/source.mp4
-   - 需要装 whisper-cpp + ffmpeg（见 adapters/script-extraction/whisper/README.md）
-   - 转录可能有错别字 / 漏字 / 标点不准——准确度比 a 差
-
-c) **跳过 script，只用元数据 + 印象**
-   - 你拿不到稿子也懒得用工具
-   - 后果：pattern 拆不深（只能看标题 / 数据 / 你的印象），但 rubric 信号还行
-   - 适合"先快速搭起来，将来补"
-
-回 a / b / c。
-```
-
-#### Phase 1b: data source（怎么拿播放/点赞/评论）
+#### Phase 1a: script source (how to get the script)
 
 ```
-数据（播放 / 点赞 / 评论 / 转发）怎么拿？
+How do you want to get the script?
 
-a) **手填数字（最简单）**
-   - 你查一下账号后台或视频页面，告诉我数字
-   - 不需要装任何工具
+a) **Paste text (simplest, recommended)**
+   - You've already organized it yourself / extracted it with a tool — paste it straight into the conversation
+   - Tool recommendations (ordered by convenience):
 
-b) **adapter 自动抓（如已配置）**
-   - 你已经装了 perf-data adapter（如 douyin-session）
-   - 给我视频 URL，工具自己抓数据 + top 评论
-   - 评论数据更全（手填只能告诉我数字，adapter 能拿到具体评论文本）
+     Douyin / Xiaohongshu:
+     - The WeChat mini-program "Qingdou" (轻抖) — paste a video link → auto-extract the script + comments. Fastest
+     - Similar tools: "Video Parsing Assistant" (视频解析助手) / "Short-video Script Extractor" (短视频文案提取) and other mini-programs
+     - Usually has a free quota; heavy use is paid
 
-回 a / b。
+     Bilibili / YouTube:
+     - The video page has a "show subtitles/transcript" button (if the creator enabled it)
+     - Third party: DownSub / SaveSubs / yt-dlp --write-auto-sub
+
+     WeChat Official Account / Substack:
+     - Copy the web page text directly
+
+b) **Transcribe video files with whisper**
+   - You downloaded the videos to samples/<account-name>/<video>/source.mp4
+   - Requires whisper-cpp + ffmpeg (see adapters/script-extraction/whisper/README.md)
+   - Transcriptions may have typos / dropped words / inaccurate punctuation — less accurate than a
+
+c) **Skip the script, use metadata + impressions only**
+   - You cannot get the script and cannot be bothered with tools
+   - Consequence: patterns cannot be broken down deeply (only title / data / your impression), but rubric signals are still usable
+   - Good for "set it up quickly now, fill it in later"
+
+Reply a / b / c.
 ```
 
-**最常见的组合**：
-- 完全零依赖路径：1a + 1b（粘文本 + 手填）—— 5 分钟搞定
-- 评论质量优先：1a + 2b（粘文本 + adapter 抓）—— 装了 adapter 就走这个
-- 拿不到稿子兜底：1b + 1b（whisper + 手填）
-
-### Phase 2: 收集材料
-
-按 Phase 1a + 1b 的组合走对应路径。
-
-**通用纪律**：每条样本最少要有 (script 或 transcript 或 N/A标记) + 数据 (4 项基础：播放/点赞/评论/转发)。
-
-#### Path A: 粘文本（Phase 1a=a）
+#### Phase 1b: data source (how to get plays/likes/comments)
 
 ```
-好。我们一条一条来。最少 3 条，推荐 5-10 条。
+How do you want to get the data (plays / likes / comments / shares)?
 
-第 1 条 script，把整段粘下面（段落版，不要字幕格式）：
+a) **Type the numbers in (simplest)**
+   - Check the account backend or the video page and tell me the numbers
+   - No tools needed
+
+b) **Adapter auto-fetch (if configured)**
+   - You already installed a perf-data adapter (e.g. douyin-session)
+   - Give me the video URL and the tool fetches the data + top comments itself
+   - Comment data is more complete (typing only gives me numbers; the adapter gets the actual comment text)
+
+Reply a / b.
 ```
 
-收到 script → 算 video_id（sha256(script_content)[:12]）→ 进 Phase 2 数据采集。
+**Most common combinations**:
+- Fully zero-dependency path: 1a + 1b (paste text + type numbers) — done in 5 minutes
+- Comment quality first: 1a + 2b (paste text + adapter fetch) — use this if an adapter is installed
+- Fallback when the script is unavailable: 1b + 1b (whisper + type numbers)
 
-#### Path B: whisper 转录（Phase 1a=b）
+### Phase 2: Collect material
 
-```
-先确认 whisper 装了：
+Follow the path matching the Phase 1a + 1b combination.
 
-[运行 `command -v whisper-cpp` 或 `command -v whisper` 检测]
+**General discipline**: every sample needs at least (script or transcript or an N/A marker) + data (4 basics: plays/likes/comments/shares).
 
-如果没装：
-  ❌ whisper 没装。三选一：
-  - brew install whisper-cpp（推荐——快）
-  - pip install openai-whisper（Python 慢些）
-  - 切回 Path A 自己粘文本（推荐用轻抖等小程序）
-
-装好后：把视频文件放到 samples/<账号名>/<video-name>/source.mp4
-（一个视频一个子目录）
-
-放好后告诉我"放好了 N 条"，我转录。
-```
-
-用户放好后：
-1. Glob `samples/<账号名>/*/source.*` 找视频文件
-2. 对每个视频跑 `bash adapters/script-extraction/whisper/run.sh <video> samples/<账号名>/<id>/`
-3. 失败项报告但继续其他
-4. 进 Phase 2 数据采集
-
-#### Path C: 跳过 script（Phase 1a=c）
-
-直接进 Phase 2 数据采集——告诉用户"没 script 我能拆的 pattern 仅限标题级别 / 你的印象，rubric 信号正常拆"。
-
-#### Phase 2 数据采集（Phase 1b=a 手填 / b adapter）
-
-**如 Phase 1b=a（手填）**：
+#### Path A: paste text (Phase 1a=a)
 
 ```
-第 1 条数据：告诉我
-- 标题
-- 播放量
-- 点赞
-- 评论数（不是评论内容，是数字）
-- 转发 / 分享数
+OK. Let's go one at a time. At least 3, 5-10 recommended.
 
-格式随意，能识别就行。例如：
-  "标题：怎么停止期待
-   播放：71w / 点赞 2.4w / 评论 899 / 转发 1.8w"
-
-如果你能再粘 top 5-10 条评论（带赞数）更好——pattern 拆能挖到模因层。
+Sample 1's script — paste the whole thing below (paragraph version, not subtitle format):
 ```
 
-**如 Phase 1b=b（adapter）**：
+Script received → compute video_id (sha256(script_content)[:12]) → go to Phase 2 data collection.
+
+#### Path B: whisper transcription (Phase 1a=b)
 
 ```
-你说装了 adapter（如 douyin-session）。给我每条视频的 URL，
-我跑 adapter 自动抓数据 + top 评论。
+First confirm whisper is installed:
 
-第 1 条 URL：
+[run `command -v whisper-cpp` or `command -v whisper` to detect]
+
+If not installed:
+  ❌ whisper is not installed. Three options:
+  - brew install whisper-cpp (recommended — fast)
+  - pip install openai-whisper (Python, slower)
+  - Switch back to Path A and paste text yourself (the Qingdou mini-program and similar are recommended)
+
+Once installed: put the video files at samples/<account-name>/<video-name>/source.mp4
+(one subdirectory per video)
+
+When they are in place, tell me "N files ready" and I'll transcribe.
 ```
 
-收到 URL → 调对应 adapter → 写数据 + 评论到 samples/<账号名>/<id>/meta.md。
+After the user sets it up:
+1. Glob `samples/<account-name>/*/source.*` for video files
+2. For each video run `bash adapters/script-extraction/whisper/run.sh <video> samples/<account-name>/<id>/`
+3. Report failures but continue with the rest
+4. Go to Phase 2 data collection
 
-**通用**：继续问第 2 条 / 第 3 条 / ... 用户说"够了"或达到 MAX_SAMPLES_PER_RUN 时进 Phase 3。
+#### Path C: skip the script (Phase 1a=c)
 
-### Phase 3: 询问"印象判断"
+Go straight to Phase 2 data collection — tell the user "without a script, the patterns I can break down are limited to the title level / your impressions; rubric signals can still be derived normally".
 
-对每条样本（不管 Way a 或 b），收完数据后**追加问印象**：
+#### Phase 2 data collection (Phase 1b=a typed / b adapter)
+
+**If Phase 1b=a (typed)**:
 
 ```
-你看完 / 听完这条视频的印象，算这个账号的：
-  a) 高表现样本（代表作 / 你想做成这样的）
-  b) 中表现样本（普通水准 / 不上不下）
-  c) 低表现样本（不算这个账号的代表 / 你不想做成这样）
+Sample 1's data — tell me:
+- Title
+- Plays
+- Likes
+- Comment count (the number, not the comment text)
+- Shares / reposts
 
-为什么？（一句话——这个判断比数据更能告诉我你想做什么风格）
+Any format is fine; I can parse it. For example:
+  "Title: how to stop expecting
+   Plays: 710k / likes 24k / comments 899 / shares 18k"
+
+If you can also paste the top 5-10 comments (with like counts), even better — that lets the pattern breakdown reach the meme level.
 ```
 
-记录 (impression_label, impression_reason) 到内存。
+**If Phase 1b=b (adapter)**:
 
-> 注意：印象**可以**和数据冲突——比如某条数据高但用户觉得"不算代表作"。这种冲突本身是有用信号，记录下来。
+```
+You said an adapter is installed (e.g. douyin-session). Give me each video's URL and
+I'll run the adapter to auto-fetch data + top comments.
 
-### Phase 4: Claude 拆 pattern + 派生 rubric 信号
+Sample 1 URL:
+```
 
-阅读所有 (script, 数据, 印象) → 自己分析：
+URL received → call the matching adapter → write data + comments to `samples/<account-name>/<id>/meta.md`.
+
+**General**: keep asking for sample 2 / 3 / ... until the user says "enough" or MAX_SAMPLES_PER_RUN is reached, then go to Phase 3.
+
+### Phase 3: Ask for the "impression judgment"
+
+For every sample (whether Way a or b), after collecting the data **ask for the impression**:
+
+```
+Your impression after watching / listening to this video — relative to this account:
+  a) High-performing sample (a representative work / the kind you want to make)
+  b) Medium-performing sample (average level / neither here nor there)
+  c) Low-performing sample (not representative of this account / you do not want to make this)
+
+Why? (one sentence — this judgment tells me more about the style you want than the data does)
+```
+
+Record (impression_label, impression_reason) in memory.
+
+> Note: the impression **may** conflict with the data — e.g. high data but the user feels it is "not representative". That conflict is itself a useful signal; record it.
+
+### Phase 4: Claude breaks down patterns + derives rubric signals
+
+Read all (script, data, impression) → analyze:
 
 #### 4a. Script patterns
 
-按 script_patterns.md 的 cheat sheet 框架拆：
-- 开头钩子：3 种类型分布（场景代入 / IS 戏仿 / 数据反转）
-- 主体结构：几段 / 怎么切
-- 句式 / 句长 / 节奏：短句还是长句、有没有标志性句式
-- emotional 标记 / 双声道
-- 致谢段 / 收尾
-- 高频词汇 / 词汇风格
+Break down per the cheat-sheet framework in script_patterns.md:
+- Opening hook: distribution of the 3 types (scene immersion / IS parody / data reversal)
+- Body structure: how many sections / how it cuts
+- Sentence patterns / length / rhythm: short or long sentences, any signature constructions
+- Emotional markers / dual-channel voice
+- Credits section / ending
+- High-frequency vocabulary / vocabulary style
 
-输出 N 个具体 pattern（每个引用具体样本作证据）。
+Output N concrete patterns (each citing specific samples as evidence).
 
-#### 4b. Rubric 信号（**仅定性，不给数值权重**）
+#### 4b. Rubric signals (**qualitative only, no numeric weights**)
 
-对每条样本打 7 维分（用通用维度），然后看：
-- 高表现样本（按用户印象）共有哪些维度高？
-- 低表现样本共有哪些维度低？
-- 哪些维度在高/低样本之间无差异（说明不是关键维度）？
+Score each sample on the 7 dimensions (using the generic dimensions), then look at:
+- Which dimensions are high across high-performing samples (by user impression)?
+- Which dimensions are low across low-performing samples?
+- Which dimensions show no difference between high/low samples (meaning they are not key dimensions)?
 
-输出**定性方向**（不是数值权重）：
-- "ER 看起来重要"（3/3 高样本 ER ≥4）
-- "SR 看起来不显著"（高低样本 SR 分布无差异）
-- "MS 高的样本评论区有明显模因爆发"
+Output **qualitative directions** (not numeric weights):
+- "ER looks important" (3/3 high samples have ER ≥4)
+- "SR looks insignificant" (no difference in SR distribution between high and low samples)
+- "Samples with high MS show obvious meme explosions in the comments"
 
-### Phase 5: 用户 review
+### Phase 5: User review
 
-一次性展示所有结果给用户：
+Show all results to the user at once:
 
 ```
-我从你给的 N 条对标视频拆出：
+From the N benchmark videos you gave me, I broke out:
 
-📝 N 个 script pattern：
-  1. **[Pattern 1 名称]**：[一句话描述] → 证据：[样本 X / Y]
+📝 N script patterns:
+  1. **[Pattern 1 name]**: [one-sentence description] → evidence: [samples X / Y]
   2. ...
-  
-🎯 Rubric 定性信号：
-  - 看起来重要的维度：ER / QL / MS（每个有 N 条高样本支持）
-  - 看起来不显著的维度：SR / NA
-  - 给的初始建议：你的对标账号是 [情感+金句驱动型] / [数据驱动型] / [类比讲解型] / ...
-  - **不直接给数值权重**——5-10 样本拟合容易过拟合，先用作 tier-2 信号
-  
-🎨 选题方向感：
-  - 主题分布大概：[主题 A 40% / 主题 B 30% / ...]
-  - 调性：[一句话]
 
-回 "ok" 我落盘，
-或指出哪些 pattern / 信号你不认同（"Pattern X 我觉得不准" / "Rubric 信号 Y 错了"）。
+🎯 Rubric qualitative signals:
+  - Dimensions that look important: ER / QL / MS (each supported by N high samples)
+  - Dimensions that look insignificant: SR / NA
+  - Initial suggestion: your benchmark account is [emotion + quotable-line driven] / [data driven] / [analogy-explainer] / ...
+  - **No numeric weights given directly** — fitting on 5-10 samples overfits easily; use these as tier-2 signals first
+
+🎨 Topic-direction sense:
+  - Rough topic distribution: [topic A 40% / topic B 30% / ...]
+  - Tone: [one sentence]
+
+Reply "ok" and I'll persist,
+or point out which patterns / signals you disagree with ("Pattern X looks off" / "Rubric signal Y is wrong").
 ```
 
-用户反馈循环：
-- "ok" → Phase 6 落盘
-- 用户挑刺 → Claude 改 → 重新展示 → 直至确认
+User feedback loop:
+- "ok" → Phase 6 persist
+- User challenges → Claude revises → show again → until confirmed
 
-### Phase 6: 落盘
+### Phase 6: Persist
 
 #### 6a. benchmark.md
 
-按 [templates/benchmark.template.md] 格式写到 `<user-channel>/benchmark.md`：
-- 账号信息（账号名、URL、调性、粉丝量级——用户提供）
-- 导入的样本表
-- 基础 rubric 派生（仅定性）
-- 选题方向感
+Write to `<user-channel>/benchmark.md` in the [templates/benchmark.template.md] format:
+- Account info (account name, URL, tone, follower scale — supplied by the user)
+- Table of imported samples
+- Base rubric derivation (qualitative only)
+- Topic-direction sense
 
-如 `--append` → 在现有 benchmark.md 的样本表追加新行 + 重新拆 pattern；不重写整个文件。
-如 `--replace` → 把现有 benchmark.md 移到 `benchmark.archived/<旧账号名>_<日期>.md`，写新的。
+If `--append` → add new rows to the sample table in the existing benchmark.md + re-derive patterns; do not rewrite the whole file.
+If `--replace` → move the existing benchmark.md to `benchmark.archived/<old-account-name>_<date>.md` and write the new one.
 
-#### 6b. samples/<账号名>/
+#### 6b. samples/<account-name>/
 
-为每条样本建子目录：
+Create a subdirectory for each sample:
 ```
-samples/<账号名>/<video-id>/
-├── source.mp4 (Way b 才有，Way a 没有)
-├── transcript.md (从粘文本写 / whisper 转出来)
-└── meta.md (标题 / 数据 / 印象 / 印象理由)
+samples/<account-name>/<video-id>/
+├── source.mp4 (Way b only; Way a has none)
+├── transcript.md (written from pasted text / whisper output)
+└── meta.md (title / data / impression / impression reason)
 ```
 
 #### 6c. script_patterns.md
 
-在 `<user-channel>/script_patterns.md` 加新段：
+Add a new section to `<user-channel>/script_patterns.md`:
 
 ```markdown
-## 对标 [账号名] 借鉴（imported on YYYY-MM-DD，N 条样本）
+## Borrowed from benchmark [account-name] (imported on YYYY-MM-DD, N samples)
 
-> 这些 pattern 来自对标账号——**Imported, untested on my channel**。
-> 实拍验证后（≥2 次跑出 + 复盘确认有效）再去掉这个标记，升入正式 pattern。
+> These patterns come from a benchmark account — **Imported, untested on my channel**.
+> After live-shoot validation (≥2 runs + retro confirmation), remove this marker and promote them to formal patterns.
 
-### Pattern A: [一句话名]
-**来自**: [样本 X]
-**描述**: [详细]
+### Pattern A: [one-sentence name]
+**From**: [sample X]
+**Description**: [detail]
 
 ### Pattern B: ...
 ```
 
 #### 6d. rubric_notes.md
 
-在 `<user-channel>/rubric_notes.md` 加 / 更新"benchmark-derived initial signals"段：
+Add / update the "benchmark-derived initial signals" section in `<user-channel>/rubric_notes.md`:
 
 ```markdown
 ## Benchmark-derived initial signals
 
-> 来自 benchmark.md 的对标账号 [账号名]（N=N 样本，import on YYYY-MM-DD）。
-> **仅定性方向，不直接采纳为数值权重**——5-10 样本拟合容易过拟合。
-> 等你自己 N≥5 校准样本后正式 bump 时**再决定**是否调权重。
+> From benchmark account [account-name] in benchmark.md (N=N samples, imported on YYYY-MM-DD).
+> **Qualitative direction only; not adopted as numeric weights directly** — fitting on 5-10 samples overfits easily.
+> When you have N≥5 calibration samples of your own and do a formal bump, **decide then** whether to adjust weights.
 
-- 看起来重要的维度: ER / QL / ...
-- 看起来不显著的维度: SR / NA / ...
-- Claude 给的初始建议: [一句话定性]
+- Dimensions that look important: ER / QL / ...
+- Dimensions that look insignificant: SR / NA / ...
+- Claude's initial suggestion: [one-sentence qualitative note]
 ```
 
-### Phase 7: 更新 state file
+### Phase 7: Update the state file
 
 ```json
 {
   "benchmark_status": "imported",
-  "benchmark_name": "<账号名>",
+  "benchmark_name": "<account-name>",
   "benchmark_sample_count": <N>
 }
 ```
 
 ## Key Rules
 
-1. **Way a 默认**——简单 + 准确。Way b 仅给"找不到 script 只有视频"的兜底
-2. **必须问印象**——纯看 transcript 拆 pattern 容易抓表面，加用户印象才挖到深层
-3. **Rubric 信号仅定性**——不直接给数值权重。5-10 样本拟合过拟合
-4. **pattern 默认标 untested**——避免污染用户自己的 pattern 库
-5. **不直接抓视频**——下载是用户的事，避免 TOS + 反爬
-6. **可重复跑**——`--append` 加新视频，`--replace` 换账号
-7. **MIN_SAMPLES = 3**：少于 3 拆不出 pattern，拒绝继续
+1. **Way a is the default** — simple + accurate. Way b is only the fallback for "no script, video only"
+2. **Impressions are mandatory** — breaking down patterns from the transcript alone tends to catch only the surface; adding the user's impression reaches the deeper layer
+3. **Rubric signals are qualitative only** — no numeric weights directly. Fitting on 5-10 samples overfits
+4. **Patterns are marked untested by default** — avoid contaminating the user's own pattern library
+5. **Do not download videos yourself** — downloading is the user's job, avoiding TOS and anti-scraping issues
+6. **Re-runnable** — `--append` adds new videos, `--replace` swaps accounts
+7. **MIN_SAMPLES = 3**: fewer than 3 yields no patterns; refuse to continue
 
 ## Refusals
 
-- 「跳过印象判断，直接拆」 → 拒绝。印象是关键 input
-- 「我只能给 1 条样本」 → 拒绝。最少 3 条
-- 「直接给我数值权重」 → 拒绝。Phase 4 只给定性信号
-- 「能不能不写 transcript 文件，只在内存里拆」 → 不行。transcript 持久化是后续 cheat-retro Phase 4b diff 的依据
-- 「帮我下载对标视频」 → 拒绝。引导用户用 yt-dlp / BBDown 等工具自己下
+- "Skip the impression judgment, just break it down" → refuse. The impression is a key input
+- "I can only give 1 sample" → refuse. At least 3
+- "Just give me numeric weights" → refuse. Phase 4 produces qualitative signals only
+- "Can we skip writing transcript files and just analyze in memory?" → no. Persisting transcripts is the basis for the later cheat-retro Phase 4b diff
+- "Download the benchmark videos for me" → refuse. Guide the user to download them themselves with yt-dlp / BBDown or similar
 
 ## Integration
 
-- 上游：`/cheat-init` Phase 2.5 在 cold-start 用户时**强烈建议**跑 `/cheat-learn-from`；calibration 用户**可选**
-- 上游：`/cheat-status` 在 `benchmark_status=pending` + 距 init >24h 时持续提醒
-- 下游：`/cheat-seed` brainstorm 时读 benchmark.md → 知道用户对标方向
-- 下游：`script_patterns.md` 加新段，cheat-seed 写 draft 时按 pattern 选结构
-- 下游：`rubric_notes.md` 加 benchmark-derived signals 段，cheat-bump 时作为参考之一
-- N≥10 提示：`cheat-status` 在用户 calibration_samples ≥10 时提示"你已有足够自己数据，benchmark 影响淡出（保留作 sanity check）"
+- Upstream: `/cheat-init` Phase 2.5 **strongly recommends** running `/cheat-learn-from` for cold-start users; **optional** for calibrated users
+- Upstream: `/cheat-status` keeps reminding when `benchmark_status=pending` + >24h since init
+- Downstream: `/cheat-seed` reads benchmark.md when brainstorming → knows the user's benchmark direction
+- Downstream: `script_patterns.md` gains a new section; cheat-seed picks structures from those patterns when writing drafts
+- Downstream: `rubric_notes.md` gains the benchmark-derived signals section, used as one reference at cheat-bump time
+- N≥10 hint: when the user's calibration_samples ≥10, `cheat-status` says "you have enough of your own data; the benchmark's influence is fading (kept as a sanity check)"
 
-## benchmark 何时淡出
+## When the benchmark fades out
 
-不是死磕样本数，是 **Claude 判断"用户数据信号是否已超过 benchmark"**：
+It is not a rigid sample count; it is **Claude judging whether the user's data signal has overtaken the benchmark**:
 
-- **默认参考**：calibration_samples ≥ 10 → benchmark 影响淡出
-- **可以更早**：N=5 但用户的 (打分, 实绩) 配对里出现 ≥3 条与 benchmark pattern 不一致的——说明你账号已经走出对标的路径
-- **可以更晚**：N=15 但用户的样本都很相似（都做同一类内容），benchmark 仍有信号价值
+- **Default reference**: calibration_samples ≥ 10 → benchmark influence fades
+- **May be earlier**: N=5 but the user's (score, actual performance) pairs include ≥3 that diverge from the benchmark patterns — meaning your account has already left the benchmark's path
+- **May be later**: N=15 but the user's samples are all similar (all the same kind of content), so the benchmark still has signal value
 
-判断条件 + 默认值都在 cheat-status 触发器 #19 / cheat-seed Phase 0 里实现。
+Judgment conditions + defaults are implemented in cheat-status trigger #19 / cheat-seed Phase 0.
 
-**淡出后**：
-- cheat-seed brainstorm 仍读 benchmark.md，但**优先级低于用户自己的 predictions/**
-- rubric_notes 的 benchmark signals 段标 `**Status: superseded by user data**`，不删但不再主导
-- benchmark.md **不删**——保留作 sanity check（看你账号是否真的偏离对标方向太远）
+**After fade-out**:
+- cheat-seed brainstorming still reads benchmark.md, but **at lower priority than the user's own predictions/**
+- The benchmark signals section in rubric_notes is marked `**Status: superseded by user data**`; kept but no longer dominant
+- benchmark.md is **not deleted** — kept as a sanity check (to see whether your account has really drifted too far from the benchmark's direction)
 
-**任何时候用户主动**：跑 `/cheat-learn-from --replace none` 完全解除 benchmark 影响
+**At any time, on user request**: run `/cheat-learn-from --replace none` to fully remove the benchmark's influence
 
-## 与其他 skill 的区别
+## Difference from other skills
 
-| Skill | 用途 |
+| Skill | Purpose |
 |---|---|
-| `/cheat-learn-from` | **从对标账号**导入 pattern / rubric 信号（一次性 / 偶尔追加） |
-| `/cheat-seed` | brainstorm 选题 + 写 draft（读 benchmark.md 作参考） |
-| `/cheat-trends` | 抓今天的热点（与 benchmark 无关） |
-| `/cheat-bump` | 升级 rubric（用户自己 N≥5 后用真实数据，不直接用 benchmark signals） |
+| `/cheat-learn-from` | Import patterns / rubric signals **from a benchmark account** (one-time / occasional appends) |
+| `/cheat-seed` | Brainstorm topics + write drafts (reads benchmark.md as reference) |
+| `/cheat-trends` | Fetch today's trends (unrelated to the benchmark) |
+| `/cheat-bump` | Upgrade the rubric (after the user has N≥5 of their own samples, using real data; benchmark signals are not used directly) |

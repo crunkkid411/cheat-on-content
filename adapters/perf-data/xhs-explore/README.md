@@ -1,152 +1,152 @@
-# Adapter: xhs-explore（小红书爬取）
+# Adapter: xhs-explore (Xiaohongshu crawler)
 
-被 `/cheat-retro` 在 `state.data_collection=adapter` + `platform=xhs` 时自动调用。
+Automatically invoked by `/cheat-retro` when `state.data_collection=adapter` + `platform=xhs`.
 
-> **来源**：照搬 `douyin-session` adapter 的架构（Playwright 持久化登录态 + 被动拦截 XHR），
-> 接口路径与字段参考 NanmiCoder/MediaCrawler 与 ReaJason/xhs。已在真实创作者账号端到端验证（2026-05）。
-> 2026-06 融合 [xhs-analytics](https://github.com/SingularGuyLeBorn/xhs-analytics) 的公开页解析能力：
-> 无登录抓取正文 / 图片 / 标签 / top 评论兜底，以及批量归档与账号汇总命令。
+> **Origin**: copies the `douyin-session` adapter's architecture (Playwright persisted login session + passive XHR interception);
+> API paths and fields reference NanmiCoder/MediaCrawler and ReaJason/xhs. Verified end-to-end on a real creator account (2026-05).
+> In 2026-06 it merged the public-page parsing capability of [xhs-analytics](https://github.com/SingularGuyLeBorn/xhs-analytics):
+> logged-out fetching of body / images / tags / top-comment fallback, plus bulk archive and account-summary commands.
 
 ---
 
-## 这个 adapter 是干嘛的
+## What this adapter does
 
-小红书反爬靠 `x-s`/`x-t`/`x-s-common` 签名 + `xsec_token`——纯 HTTP / requests 拿不到数据。
+Xiaohongshu's anti-scraping relies on `x-s`/`x-t`/`x-s-common` signatures + `xsec_token` — plain HTTP / requests gets no data.
 
-xhs-explore 用 **Playwright + 持久化 Chromium context** 模拟真实浏览器，**不逆向签名、不伪造请求**，
-让页面自己发带签名的请求，我们只被动拦截返回的 JSON；同时用公开页 `__INITIAL_STATE__` 做正文/图片/评论兜底：
+xhs-explore uses **Playwright + a persistent Chromium context** to simulate a real browser, **without reverse-engineering signatures or forging requests**:
+it lets the page send its own signed requests and only passively intercepts the returned JSON; it also uses the public page's `__INITIAL_STATE__` as a fallback for body/images/comments:
 
-- 首次扫码登录创作者中心，cookie 存在**你的内容项目根目录** `.auth-xhs/`
-- 之后每次抓取复用 cookie
-- 抓三路数据：
-  1. **创作者中心 galaxy 接口**（`/api/galaxy/v2/creator/note/user/posted`）— 你**自己**笔记的运营数据：观看/点赞/收藏/评论/分享，**不需要 xsec_token**，最稳。列表每条自带 `xsec_token`，抓自己的笔记无需手动粘带 token 的链接
-  2. **前台 web API**（`/api/sns/web/v1/feed` + `/api/sns/web/v2/comment/page`）— 拿确认字段的点赞/收藏数 + 评论文本
-  3. **公开页兜底**（`www.xiaohongshu.com/explore/<note_id>` 的 `window.__INITIAL_STATE__`）— **无需登录**即可补全正文、图片 URL、标签；当前台 API 拿不到评论时，用公开页里的 top 评论兜底（通常 ~10 条）
+- Scan the QR code to log in to the creator center the first time; the cookie is stored in **your content project root** under `.auth-xhs/`
+- Every later fetch reuses the cookie
+- It fetches three data paths:
+  1. **Creator-center galaxy API** (`/api/galaxy/v2/creator/note/user/posted`) — operational data for **your own** notes: views/likes/saves/comments/shares, **no xsec_token needed**, the most stable. Each list item carries its own `xsec_token`, so fetching your own notes needs no manual pasting of tokenized links
+  2. **Frontend web API** (`/api/sns/web/v1/feed` + `/api/sns/web/v2/comment/page`) — confirmed like/save counts + comment text
+  3. **Public-page fallback** (`window.__INITIAL_STATE__` on `www.xiaohongshu.com/explore/<note_id>`) — **no login needed** to fill in the body, image URLs, and tags; when the frontend API cannot get comments, use the public page's top comments as a fallback (usually ~10)
 
-输出写到**你的内容项目** `videos/<...>/report.md`。
-调试产物（URL dump / 截图 / galaxy 原始 JSON）写到 `.cheat-cache/xhs-explore-debug/`。
+Output is written to **your content project's** `videos/<...>/report.md`.
+Debug artifacts (URL dumps / screenshots / raw galaxy JSON) are written to `.cheat-cache/xhs-explore-debug/`.
 
-## 字段映射（已校准）
+## Field mapping (calibrated)
 
-galaxy `note/user/posted` 的真实字段名已用真实账号确认并写死在 `crawler.py` 的 `_normalize_note()`：
-观看 `view_count`、点赞 `likes`、收藏 `collected_count`、评论 `comments_count`、分享 `shared_count`、
-发布时间 `visible_time`（unix 秒）/ `time`（本地时间串）、单篇 `xsec_token`。
+The real field names of galaxy `note/user/posted` have been confirmed on a real account and are hardcoded in `_normalize_note()` in `crawler.py`:
+views `view_count`, likes `likes`, saves `collected_count`, comments `comments_count`, shares `shared_count`,
+publish time `visible_time` (unix seconds) / `time` (local time string), per-note `xsec_token`.
 
-万一小红书改版导致某项显示 0：打开 `videos/<...>/report.md` 末尾的"galaxy 原始字段"JSON，
-把新 key 加进 `_normalize_note()` 对应的 `_first(v, ...)` 候选列表即可（多候选兜底仍保留）。
+If a Xiaohongshu redesign makes a field show 0: open the "galaxy raw fields" JSON at the end of `videos/<...>/report.md`
+and add the new key to the corresponding `_first(v, ...)` candidate list in `_normalize_note()` (the multi-candidate fallback is retained).
 
-## 安装（一次性）
+## Installation (one-time)
 
 ```bash
-# 1. 进你的内容项目根目录
+# 1. Enter your content project root
 cd ~/Documents/my-channel
 
-# 2. 建虚拟环境
+# 2. Create a virtual environment
 python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 
-# 3. 装依赖（Playwright + Chromium + requests）
+# 3. Install dependencies (Playwright + Chromium + requests)
 pip install -r "$ADAPTER/requirements.txt"
 playwright install chromium
 
-# 4. 首次扫码登录小红书创作者中心
+# 4. Log in to the Xiaohongshu creator center via QR code for the first time
 ADAPTER=$(find ~/cheat-on-content -name "xhs-explore" -type d 2>/dev/null | head -1)
 python "$ADAPTER/crawler.py" login
-# → 弹出 Chromium 窗口，用小红书 App 扫码
-# → 登录成功后窗口自动关闭，cookie 存在 当前目录/.auth-xhs/
+# → a Chromium window opens; scan the QR code with the Xiaohongshu app
+# → the window closes automatically after login; the cookie is stored in the current directory/.auth-xhs/
 ```
 
-> Windows 提示：adapter 在 `~/cheat-on-content/adapters/perf-data/xhs-explore`（克隆源码处），
-> 不在 `~/.claude/skills`（install.sh 只复制 15 个 skill，不复制 adapter）。
+> Windows note: the adapter lives at `~/cheat-on-content/adapters/perf-data/xhs-explore` (the cloned source),
+> not in `~/.claude/skills` (install.sh only copies the 15 skills, not adapters).
 
-## 用法
+## Usage
 
-cheat-retro 自动调用。手动测试：
+cheat-retro calls it automatically. Manual testing:
 
 ```bash
 cd ~/Documents/my-channel
 source .venv/bin/activate
 
-# 列最近笔记（验证登录态没失效）
+# List recent notes (verify the login session has not expired)
 python "$ADAPTER/review.py" list
 
-# 抓特定笔记
+# Fetch a specific note
 python "$ADAPTER/review.py" note <note_id> [script.txt]
 
-# 抓特定笔记并下载图片到 videos/<...>/images/
+# Fetch a specific note and download images to videos/<...>/images/
 XHS_DOWNLOAD_IMAGES=1 python "$ADAPTER/review.py" note <note_id>
 
-# 批量归档已发布笔记的正文+图片（公开页解析，无登录）
+# Bulk-archive the body + images of published notes (public-page parsing, no login)
 python "$ADAPTER/review.py" archive my_notes.json data/raw/notes/archive 50
 
-# 账号级汇总（基于创作者中心最近 50 条 + 公开页标签）
+# Account-level summary (based on the creator center's latest 50 + public-page tags)
 python "$ADAPTER/review.py" summarize reports
 ```
 
-输出在 当前目录/videos/<日期>_<标题>/report.md；archive 输出在 `<output_root>/<note_id>/`。
+Output goes to current-directory/videos/<date>_<title>/report.md; archive output goes to `<output_root>/<note_id>/`.
 
-## 怎么拿到 note_id
+## How to get the note_id
 
-小红书笔记 URL：
+Xiaohongshu note URLs:
 - `https://www.xiaohongshu.com/explore/66f1a2b3c4d5e6f700112233?xsec_token=...` → `note_id = 66f1a2b3c4d5e6f700112233`
-- `https://xhslink.com/xxxxx` → 短链，cheat-publish 会 resolve
+- `https://xhslink.com/xxxxx` → short link; cheat-publish resolves it
 
-cheat-publish 登记发布时把 note_id 存到 prediction header，cheat-retro 启动时读这个字段。
+When cheat-publish registers a publish it stores the note_id in the prediction header, and cheat-retro reads that field at startup.
 
-## report.md 输出格式
+## report.md output format
 
-由 `renderer.py` 生成：
-- 笔记元信息（标题、发布时间、链接、IP 归属）
-- 数据快照（曝光/浏览、点赞、收藏、评论、分享 + 派生比率：赞曝比 / 藏曝比 / 评曝比 / 分曝比 + 涨粉）
-- 正文 + 标签（公开页兜底时才有）
-- 图片（本地路径优先，否则 URL）
-- galaxy 原始字段 JSON（debug / 接口改版时核对字段用）
-- 原始稿子（cheat-retro 传入）
-- Top 评论（按赞数排序，含文本 + 赞数 + IP）
+Generated by `renderer.py`:
+- Note metadata (title, publish time, link, IP location)
+- Data snapshot (impressions/views, likes, saves, comments, shares + derived ratios: like-to-impression / save-to-impression / comment-to-impression / share-to-impression + follower gain)
+- Body + tags (only present when the public-page fallback is used)
+- Images (local path preferred, otherwise URL)
+- galaxy raw fields JSON (debug / for checking fields when the API changes)
+- The original script (passed in by cheat-retro)
+- Top comments (sorted by like count, including text + like count + IP)
 
-## 失败模式（按概率从高到低）
+## Failure modes (highest to lowest probability)
 
-| 症状 | 原因 | 处理 |
+| Symptom | Cause | Handling |
 |---|---|---|
-| 曝光显示 0 但 JSON 有数 | galaxy 字段 key 不在候选列表 | 看 report.md 里 galaxy JSON，把真实 key 加进 `_normalize_note` |
-| `ensure_login` 超时 | cookie 过期 | 重跑 `python crawler.py login` |
-| 笔记列表为空 | 创作者中心改了 galaxy 接口路径 | 看 `.cheat-cache/xhs-explore-debug/creator_urls.txt`，更新 `GALAXY_*_KEYS` |
-| 评论抓不到 | xsec_token 缺失 / 评论被关 / 登录过期 | 先看 `frontend_urls.txt`；再用公开页兜底 top 评论；最后 manual 粘评论 |
-| 正文/图片/标签缺失 | 公开页也解析失败 | 检查 note_id 与 xsec_token；网页结构改版时更新 `_extract_initial_state` |
-| Chromium 崩溃 | 内存不足 | 关其他 Chromium；`playwright install chromium --force` |
+| Impressions show 0 but the JSON has data | The galaxy field key is not in the candidate list | Check the galaxy JSON in report.md and add the real key to `_normalize_note` |
+| `ensure_login` times out | Cookie expired | Rerun `python crawler.py login` |
+| Note list is empty | The creator center changed the galaxy API path | Check `.cheat-cache/xhs-explore-debug/creator_urls.txt` and update `GALAXY_*_KEYS` |
+| Comments not fetched | xsec_token missing / comments closed / login expired | Check `frontend_urls.txt` first; then fall back to public-page top comments; finally paste comments manually |
+| Body/images/tags missing | The public page also failed to parse | Check the note_id and xsec_token; update `_extract_initial_state` when the page structure changes |
+| Chromium crashes | Insufficient memory | Close other Chromium instances; `playwright install chromium --force` |
 
-**关键现实**：小红书接口 path（`/feed`、`/comment/page`、galaxy）相对稳定，但签名和 xsec_token 机制常变。
-本 adapter 用被动拦截 + 公开页兜底规避签名风险——最易抖动处是 **galaxy 创作者接口**和**评论回复**。
+**Key reality**: Xiaohongshu's API paths (`/feed`, `/comment/page`, galaxy) are relatively stable, but the signature and xsec_token mechanisms change often.
+This adapter avoids signature risk through passive interception + public-page fallback — the most fragile parts are the **galaxy creator API** and **comment replies**.
 
-## 稳定性等级
+## Stability level
 
-★★ — Playwright + 登录态能扛比纯 HTTP 强得多的反爬，但仍受小红书前端改版影响。
-评论路径（依赖 xsec_token）比创作者数据路径脆，必要时降级 manual 或公开页兜底。
+★★ — Playwright + a login session withstands far stronger anti-scraping than plain HTTP, but is still affected by Xiaohongshu frontend redesigns.
+The comment path (dependent on xsec_token) is more fragile than the creator-data path; when necessary, degrade to manual or the public-page fallback.
 
-## 风险提示
+## Risk notes
 
-- **冷启动用户慎装**：Playwright + Chromium ~500MB
-- **TOS 风险**：用自己的 cookie 抓自己后台数据是个人用途；别滥用、别高频
-- **不要把 `.auth-xhs/` 提交到 git**：cookie 含会话凭据，泄露 = 他人能登录你的小红书账号
-- `.cheat-cache/xhs-explore-debug/` 也不应提交（含调试截图 / 接口 URL / 原始 JSON）
+- **Cold-start users should install with care**: Playwright + Chromium ~500MB
+- **TOS risk**: using your own cookie to fetch your own backend data is personal use; do not abuse it, do not run it at high frequency
+- **Do not commit `.auth-xhs/` to git**: the cookie contains session credentials; a leak = someone else can log in to your Xiaohongshu account
+- `.cheat-cache/xhs-explore-debug/` should also not be committed (it contains debug screenshots / API URLs / raw JSON)
 
-## 文件清单
+## File list
 
 ```
 adapters/perf-data/xhs-explore/
-├── README.md           # 本文件
+├── README.md           # this file
 ├── requirements.txt    # playwright>=1.44, requests>=2.28
-├── crawler.py          # 抓取核心（galaxy / 前台 API / 公开页兜底 / 图片下载）
-├── review.py           # CLI 入口（login / list / note / archive / summarize）
-├── renderer.py         # 把抓回的 JSON 渲染成 report.md
-├── paths.py            # 项目根 / .auth-xhs / debug 路径解析
-└── run.sh              # cheat-retro 调用的 wrapper
+├── crawler.py          # crawl core (galaxy / frontend API / public-page fallback / image download)
+├── review.py           # CLI entry point (login / list / note / archive / summarize)
+├── renderer.py         # renders the fetched JSON into report.md
+├── paths.py            # project root / .auth-xhs / debug path resolution
+└── run.sh              # wrapper invoked by cheat-retro
 ```
 
-## 与其他 adapter 的关系
+## Relationship to the other adapters
 
-- `douyin-session` — 抖音，本 adapter 的架构来源
-- `youtube-data-api`（待）— YouTube 官方 API，更轻
-- `bilibili-stat`（待）— B 站官方 stat 接口
+- `douyin-session` — Douyin; this adapter's architecture source
+- `youtube-data-api` (pending) — YouTube official API, lighter
+- `bilibili-stat` (pending) — Bilibili official stat API
 
-如果你做多平台内容，**只装你实际用的 adapter**。
+If you make content across platforms, **install only the adapters you actually use**.

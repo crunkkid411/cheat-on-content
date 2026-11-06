@@ -1,145 +1,145 @@
-# Starter Rubric：播客 / 长视频 — v0 cold-start 占位
+# Starter Rubric: podcast / long video — v0 cold-start placeholder
 
-**这是给完全没数据的新主播用的占位 rubric。**它会打错。**前 5 期预测精度大概 ±50%——这是 cold-start 的数学事实，不是 rubric 失败**。
+**This is a placeholder rubric for new hosts with absolutely no data.** It will score things wrong. **Prediction accuracy for the first 5 episodes is roughly ±50% — that is a mathematical fact of cold-start, not a rubric failure.**
 
-跑完 5 期（每期都走完 `/cheat-predict` → 发布 → `/cheat-retro` 闭环）之后，你会有第一份个人校准数据，可以提议第一次 `/cheat-bump` 升级到 v1。
+After running 5 episodes (each completing the `/cheat-predict` → publish → `/cheat-retro` loop), you will have your first personal calibration data and can propose the first `/cheat-bump` to v1.
 
 ---
 
-## v0 综合分公式（**等权占位**）
+## v0 composite formula (**equal-weight placeholder**)
 
 ```
 composite = (ER + HP + QL + NA + AB + SR + SAT) / 7 × 2.0
 ```
 
-每个维度 0-5 整数分。综合分范围 0-10。
+Each dimension is an integer 0-5. The composite range is 0-10.
 
-**为什么等权**：你没有数据支持任何特定权重。等权能让你在数据出来之前对每个维度都给"中立的关注"。第 5 期之后你的复盘数据会告诉你哪些维度真的预测了你的节目的传播。
-
----
-
-## 7 个维度
-
-### ER — Emotional Resonance（情感共鸣）
-*这期节目能否在某个时刻让听众产生一种**具体的、能命名的**情感？*
-
-播客的情感共鸣通常来自嘉宾 / 主播的真实时刻——突然的沉默、声音的变化、一个没准备好但说出来的真话。
-
-- **0** — 全程信息传递；像在读稿
-- **3** — 有共鸣但停留在"聊得挺好"
-- **5** — 有至少一个让人摘下耳机愣一下的时刻
-
-### HP — Hook Potential（钩子强度）
-*前 60 秒能不能让听众决定听完这一期？*
-
-播客的竞争对手是"切到下一期" / "打开音乐 App"。前 60 秒决定留存。
-
-- **0** — "大家好欢迎来到第 N 期，今天我们聊..."
-- **3** — 开头给出具体承诺或抛出一个反直觉问题
-- **5** — 前 60 秒直接进入一个具体、生动、让人想知道后续的场景或争论
-
-### QL — Quotable Lines（可剪辑金句）
-*这期有没有 2-3 个值得做切片 / 短视频的片段？*
-
-播客的二次传播主要靠短视频切片和文字摘录。QL 衡量的是"能被切出来独立传播的密度"。
-
-- **0** — 全程闲聊，没有可独立传播的片段
-- **3** — 有一个值得切的高光片段
-- **5** — 多个可切片段，分布在节目不同位置；文字版也有可截图的句子
-
-### NA — Narrativity（节目弧线）
-*这期有没有让人想听到最后的整体弧线？*
-
-- **0** — 话题随机跳转；中间退出不影响理解
-- **3** — 有松散主线但中段可跳过
-- **5** — 紧凑弧线——有悬念、有转折、有落点；中途退出会觉得"没听完"
-
-### AB — Audience Breadth（受众广度）
-*这期话题的潜在听众群有多广？*
-
-- **0** — 极小众领域 / 需要大量前置知识
-- **3** — 特定群体（创业者 / 某行业从业者 / 某爱好圈）
-- **5** — 普世话题——任何人都能代入（关系、焦虑、选择、成长）
-
-### SR — Social Resonance（社会议题共振）
-*这期触及当下的社会模式或集体情绪吗？*
-
-- **0** — 纯个人经历 / 技术细节
-- **3** — 触到公认现象但没新视角
-- **5** — 对话中命名了一个听众感受到但没听人说出来的结构性模式
-
-### SAT — Satire Depth（幽默 / 反讽深度）
-*这期的对话在幽默和反讽层面有多少层次？*
-
-- **0** — 严肃正经；没有幽默成分
-- **3** — 有自然的幽默 / 一层调侃
-- **5** — 多层反讽、嘉宾之间的化学反应产生的"段子"、可传播的梗
-
-播客的幽默通常是自然涌现而非设计的。如果你的节目走严肃深度路线，SAT 给 2-3 当占位即可。
+**Why equal weights**: you have no data supporting any particular weight. Equal weights let you give each dimension "neutral attention" before the data arrives. After the 5th episode your retro data will tell you which dimensions actually predict spread for your show.
 
 ---
 
-## Bucket 预测：比率桶方案
+## The 7 dimensions
 
-> ⚠️ **新人的 bucket 不能用绝对数字**——头部播客的"5w 播放是底部"对新节目来说是梦想数据。
+### ER — Emotional Resonance
+*Can this episode make the listener feel a **concrete, nameable** emotion at some moment?*
 
-### 第 1 期：平台通用默认
+Podcast emotional resonance usually comes from a real moment with the guest / host — a sudden silence, a change in voice, a truth said before it was ready.
 
-小宇宙 / Apple Podcasts / Spotify / YouTube 新播客第 1 期的典型分布：
+- **0** — Information transfer throughout; sounds like reading a script
+- **3** — Resonates but stays at "nice chat"
+- **5** — At least one moment that makes people take off their headphones and pause
 
-| Bucket | 范围（播放 / 收听数）| 先验概率 |
+### HP — Hook Potential
+*Can the first 60 seconds make the listener decide to finish this episode?*
+
+A podcast's competitors are "skip to the next episode" / "open the music app". The first 60 seconds decide retention.
+
+- **0** — "Hello everyone, welcome to episode N, today we'll talk about..."
+- **3** — The opening gives a concrete promise or throws out a counterintuitive question
+- **5** — The first 60 seconds go straight into a concrete, vivid scene or argument that makes people want to know what happens next
+
+### QL — Quotable Lines (clippable quotables)
+*Are there 2-3 segments worth making into clips / short videos?*
+
+A podcast's secondary spread relies mainly on short-video clips and text excerpts. QL measures "the density of segments that can be cut out and spread independently".
+
+- **0** — Chitchat throughout; no independently spreadable segment
+- **3** — One highlight segment worth clipping
+- **5** — Multiple clippable segments distributed across different parts of the episode; the text version also has screenshot-worthy sentences
+
+### NA — Narrativity (episode arc)
+*Does this episode have an overall arc that makes people want to listen to the end?*
+
+- **0** — Topics jump randomly; quitting midway does not affect comprehension
+- **3** — A loose throughline but the middle can be skipped
+- **5** — A tight arc — suspense, a turn, a landing; quitting midway feels like "not finishing"
+
+### AB — Audience Breadth
+*How broad is the potential listener group for this episode's topic?*
+
+- **0** — Very niche field / requires a lot of prior knowledge
+- **3** — A specific group (founders / people in an industry / a hobby circle)
+- **5** — Universal topic — anyone can relate (relationships, anxiety, choices, growth)
+
+### SR — Social Resonance
+*Does this episode touch the current social pattern or collective mood?*
+
+- **0** — Purely personal experience / technical detail
+- **3** — Touches a recognized phenomenon but adds no new perspective
+- **5** — The conversation names a structural pattern listeners feel but have not heard anyone say
+
+### SAT — Satire Depth (humor / irony depth)
+*How many layers of humor and irony does this episode's conversation have?*
+
+- **0** — Serious and straight; no humor
+- **3** — Natural humor / one layer of banter
+- **5** — Multi-layered irony, "bits" produced by guest chemistry, spreadable memes
+
+Podcast humor usually emerges naturally rather than being designed. If your show takes a serious, in-depth route, give SAT 2-3 as a placeholder.
+
+---
+
+## Bucket prediction: ratio bucket scheme
+
+> ⚠️ **A newcomer's buckets cannot use absolute numbers** — a top podcast's "50k plays is the floor" is dream data for a new show.
+
+### Episode 1: platform-generic defaults
+
+The typical distribution for a new podcast's first episode on Xiaoyuzhou / Apple Podcasts / Spotify / YouTube:
+
+| Bucket | Range (plays / listens) | Prior probability |
 |---|---|---|
-| 底部 | < 30 | 30% |
-| 基础盘 | 30 - 300 | 40% |
-| 命中 | 300 - 3,000 | 20% |
-| 小爆 | 3,000 - 30,000 | 8% |
-| 大爆 | > 30,000 | 2% |
+| Floor | < 30 | 30% |
+| Base | 30 - 300 | 40% |
+| Hit | 300 - 3,000 | 20% |
+| Small hit | 3,000 - 30,000 | 8% |
+| Big hit | > 30,000 | 2% |
 
-> YouTube 长视频用播放数；纯音频平台用收听数。
+> YouTube long videos use plays; pure audio platforms use listens.
 
-### 第 2 期起：用比率桶
+### From episode 2 on: use ratio buckets
 
-`baseline = 上一期实际播放数`（或最近 3 期中位数）。
+`baseline = the previous episode's actual plays` (or the median of the last 3).
 
-| Bucket | 倍数范围 | 含义 |
+| Bucket | Multiple range | Meaning |
 |---|---|---|
-| 退步 | < 0.3 × baseline | 明显下滑 |
-| 持平 | 0.3 - 1 × baseline | 同档 |
-| 命中 | 1 - 3 × baseline | 中度突破 |
-| 小爆 | 3 - 10 × baseline | 显著破圈 |
-| 大爆 | > 10 × baseline | 量级跃迁 |
+| Regression | < 0.3 × baseline | Clear decline |
+| Flat | 0.3 - 1 × baseline | Same tier |
+| Hit | 1 - 3 × baseline | Moderate breakthrough |
+| Small hit | 3 - 10 × baseline | Significant breakout |
+| Big hit | > 10 × baseline | Order-of-magnitude leap |
 
-第 5 期后跑 `/cheat-bump --bucket-only` 重新校准边界。
+After the 5th episode, run `/cheat-bump --bucket-only` to recalibrate the boundaries.
 
 ---
 
-## Cold-start 战略（简版）
+## Cold-start strategy (short version)
 
-前 5 期的"预测"不是预测——是**数据采集**。
+The "predictions" for the first 5 episodes are not predictions — they are **data collection**.
 
-1. **建立纪律**：录制前根据提纲写下盲判断（播客不可能完全预测对话走向，但提纲级别的评估仍然有价值）
-2. **记录 7 维评分**：复盘后每期样本变成 (打分, 实绩) 配对
-3. **取样策略**：主动选维度组合差异最大的期——1 期深度访谈 (ER 主导)、1 期热点评论 (SR 主导)、1 期轻松闲聊 (SAT 主导)、1 期干货密集 (QL 主导)、1 期综合中等
+1. **Build discipline**: write a blind judgment from the outline before recording (a podcast cannot fully predict where the conversation goes, but an outline-level assessment is still valuable)
+2. **Record 7-dimension scores**: after the retro each episode sample becomes a (score, actual) pair
+3. **Sampling strategy**: actively pick episodes with the most divergent dimension combinations — 1 deep interview (ER-dominant), 1 current-events commentary (SR-dominant), 1 light chat (SAT-dominant), 1 dense practical content (QL-dominant), 1 medium all-round
 
-| 校准样本 | 你能相信什么 |
+| Calibration samples | What you can trust |
 |---|---|
-| N=0-2 | 啥都别信 |
-| N=3-5 | 相信"哪个维度可能重要"的方向 |
-| N=5-10 | 相信 bucket 排序 |
-| N=10-20 | 中枢可信 ±30% |
-| N≥20 | rubric 真正成为"作弊器" |
+| N=0-2 | Nothing |
+| N=3-5 | Trust the direction of "which dimension may matter" |
+| N=5-10 | Trust bucket ordering |
+| N=10-20 | The center is trustworthy to ±30% |
+| N≥20 | The rubric truly becomes a "cheat code" |
 
 ---
 
-## 重要警告
+## Important warnings
 
-- cold-start 期 composite 的置信度低——**不要基于 v0 分数决定要不要录某期节目**
-- 播客制作周期长——5 期校准可能需要 1-3 个月，**坚持走完闭环**
-- 前 5 期**每期必须走完整闭环**（predict → 发布 → retro），跳过任何一期复盘 = 整个校准失败
-- 第 5 期后**必须**跑 `/cheat-bump` 升级
+- Cold-start composites have low confidence — **do not decide whether to record an episode based on a v0 score**
+- Podcast production cycles are long — 5 calibrations may take 1-3 months, **stick with the full loop**
+- The first 5 episodes **must each complete the full loop** (predict → publish → retro); skipping any retro = the whole calibration fails
+- After the 5th episode you **must** run `/cheat-bump` to upgrade
 
 ---
 
-## 最重要的一句话
+## The most important sentence
 
-**前 5 期你不是在做决策，你是在收集数据。** 播客迭代慢，更要珍惜每一期的校准价值——别跳过复盘。
+**For the first 5 episodes you are not making decisions; you are collecting data.** Podcasts iterate slowly, so value each episode's calibration value even more — do not skip the retro.

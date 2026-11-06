@@ -1,194 +1,194 @@
-# Cadence Protocol（节奏协议）
+# Cadence Protocol
 
-被这些子 skill 引用：`cheat-status`、`cheat-recommend`、`cheat-shoot`、`cheat-publish`、SessionStart hook。
+Referenced by these sub-skills: `cheat-status`, `cheat-recommend`, `cheat-shoot`, `cheat-publish`, and the SessionStart hook.
 
-固化"哪天该做什么"——避免用户驱动每一步。让 Claude 在会话开场就能回答"我现在该拍 / 该发 / 该复盘"。
-
----
-
-## 三层节奏
-
-### 日级（每天 / 每次会话开场）
-
-1. SessionStart hook 自动渲染 4-6 行报告：
-   - 📦 Buffer 状态（颜色 + 数量）
-   - ⏰ 待复盘到期项
-   - 🎯 候选池 top 3（粗排）
-   - 📅 上次抓热点时间
-   - ⚠️ 关键 to-do
-2. 不主动开始任何动作——等用户决定
-
-### 事件级（T+`RETRO_WINDOW_DAYS` 天到期）
-
-- 任何已发未复盘 + 时间到 → SessionStart 顶部高亮
-- 用户给数据（粘 / URL）→ `/cheat-retro` 自动跑
-
-### 周级（用户决定的"集中处理日"）
-
-- 抓热点（`/cheat-trends`）刷新候选池
-- 检查 rubric bump 触发条件
-- 清理 STATUS.md / rubric_notes.md 是否需要清算
+Cement "what to do on which day" — so the user does not have to drive every step. Claude can answer "should I shoot / publish / retro now?" at the start of a session.
 
 ---
 
-## Buffer 警戒规则
+## Three layers of cadence
 
-**Buffer = `state.shoots` 数组长度** = 已拍但未发布的视频数。
+### Daily (every day / every session start)
 
-`/cheat-shoot` 把视频加进 `state.shoots`，`/cheat-publish` 移除——两个事件分开使 buffer 跟踪准确。
+1. The SessionStart hook automatically renders a 4-6 line report:
+   - 📦 Buffer status (color + count)
+   - ⏰ Retros that are due
+   - 🎯 Candidate-pool top 3 (rough ranking)
+   - 📅 Last trend fetch time
+   - ⚠️ Key to-dos
+2. Do not proactively start any action — wait for the user to decide
 
-### 颜色阈值（按 `target_publish_cadence_days` 派生）
+### Event-level (due at T+`RETRO_WINDOW_DAYS` days)
+
+- Any published-but-not-retroed piece whose time has come → highlighted at the top of SessionStart
+- The user supplies data (paste / URL) → `/cheat-retro` runs automatically
+
+### Weekly (the user-chosen "batch day")
+
+- Fetch trends (`/cheat-trends`) to refresh the candidate pool
+- Check rubric bump triggers
+- Check whether STATUS.md / rubric_notes.md need cleanup
+
+---
+
+## Buffer warning rules
+
+**Buffer = the length of the `state.shoots` array** = the number of videos shot but not published.
+
+`/cheat-shoot` adds a video to `state.shoots`; `/cheat-publish` removes it — separating the two events makes buffer tracking accurate.
+
+### Color thresholds (derived from `target_publish_cadence_days`)
 
 `buffer_days = buffer_count × target_publish_cadence_days`
 
-| buffer_days | 颜色 | 含义 | 行动 |
+| buffer_days | Color | Meaning | Action |
 |---|---|---|---|
-| < 1 | 🔴 **红** | 警戒——下个发布日可能断更 | **今天必须拍**，且只拍稳分（top 1，不冒险） |
-| 1-2 | 🟠 橙 | 偏低 | 应该拍 1-2 条 |
-| 3-5 | 🟢 绿 | 正常 | 节奏稳定，可以拍可以休 |
-| > 5 | 🔵 蓝 | 积压 | **暂停拍摄**，全力发布存货 + 复盘 |
+| < 1 | 🔴 **Red** | Warning — the next publish day may slip | **Must shoot today**, and only shoot a safe bet (top 1, no gambling) |
+| 1-2 | 🟠 Orange | Low | Should shoot 1-2 pieces |
+| 3-5 | 🟢 Green | Normal | Steady cadence; shoot or rest as you like |
+| > 5 | 🔵 Blue | Backlog | **Pause shooting**; focus on publishing inventory + retros |
 
-**示例**：
-- 用户 cadence = 1（日更），buffer count = 0 → buffer_days = 0 → 🔴
-- 用户 cadence = 7（周更），buffer count = 1 → buffer_days = 7 → 🔵（一篇够发七天）
-- 用户 cadence = 1，buffer count = 4 → buffer_days = 4 → 🟢
+**Examples**:
+- User cadence = 1 (daily), buffer count = 0 → buffer_days = 0 → 🔴
+- User cadence = 7 (weekly), buffer count = 1 → buffer_days = 7 → 🔵 (one piece covers seven days)
+- User cadence = 1, buffer count = 4 → buffer_days = 4 → 🟢
 
-### 灵活节奏（target_publish_cadence_days = null）
+### Flexible cadence (target_publish_cadence_days = null)
 
-用户在 cheat-init 选"灵活/不固定" → buffer 监控**关闭**。SessionStart 报告只显示"已拍未发：N 条"，不显示颜色，不警戒。
+If the user chose "flexible / no fixed schedule" in cheat-init → buffer monitoring is **off**. The SessionStart report only shows "shot but unpublished: N", with no color and no warning.
 
 ---
 
-## 选题策略（`/cheat-recommend` 推 ≥ 2 个时）
+## Topic strategy (when `/cheat-recommend` proposes ≥ 2)
 
-每次推荐 2 条时遵循 **1 稳分 + 1 实验性** 原则：
+Every 2-topic recommendation follows the **1 safe bet + 1 experiment** principle:
 
-### 第 1 条（稳分）
+### Piece 1 (safe bet)
 
-- 排序 top 1-3
-- 类目与最近 N 条已发**不重复**（N = max(3, target_publish_cadence_days × 3)，避免审美疲劳）
-- composite 高 + 议题安全（非 risky）
+- Ranking top 1-3
+- Category does **not** repeat the last N published pieces (N = max(3, target_publish_cadence_days × 3), avoiding audience fatigue)
+- High composite + topic safety (not risky)
 
-### 第 2 条（实验性）
+### Piece 2 (experiment)
 
-- 候选池里能验证某个**待验证假设**的样本（如新维度的 A/B 对照）
-- 或验证某个**新 pattern**（[script_patterns.md](script_patterns.md) 的 Pattern N）
-- composite 不一定 top，但有"信息价值"——复盘后能让 rubric / pattern 库前进
+- A candidate-pool sample that can verify a **hypothesis to verify** (e.g. an A/B comparison for a new dimension)
+- Or verify a **new pattern** (Pattern N in [script_patterns.md](script_patterns.md))
+- Composite need not be top, but it must have "information value" — after the retro it should move the rubric / pattern library forward
 
-### Buffer 颜色对推荐的覆盖
+### How buffer color overrides recommendations
 
-| Buffer 颜色 | 推荐策略覆盖 |
+| Buffer color | Recommendation override |
 |---|---|
-| 🔴 红 | **只推稳分 top 1**——不推实验性。"今天能拍出来就行" |
-| 🟠 橙 | 1 稳 + 1 实验，但建议优先拍稳分 |
-| 🟢 绿 | 标准 1+1 |
-| 🔵 蓝 | **暂停推荐**——回 "你 buffer 积压了，先发存货 + 复盘" |
+| 🔴 Red | **Only recommend the safe-bet top 1** — no experiment. "Whatever you can shoot today is fine" |
+| 🟠 Orange | 1 safe + 1 experiment, but prioritize the safe bet |
+| 🟢 Green | Standard 1+1 |
+| 🔵 Blue | **Pause recommendations** — reply "your buffer is backlogged; publish inventory + retro first" |
 
-**关键约束**（任何颜色都遵守）：
-- 同一 category 连发 ≤ 2 条
-- 已发过的 candidate（标 done）不推
-- 用户主动跳过的 candidate（标 skip）6 个月内不推
-
----
-
-## 节奏元规则
-
-按优先级（高→低）：
-
-1. **Buffer 优先于评分**：红色警戒时不要因为"等更好的选题"而断更——拍 composite 7.5 的稳分比"等明天的 9.0"安全
-2. **复盘优先于新拍**：T+RETRO_WINDOW_DAYS 到期当天**先复盘再考虑拍新的**——否则数据信号丢失，rubric 校准受损
-3. **同步优先于积压**：buffer 满（蓝色）时不要再拍，先发掉再说——已拍议题的时效性会衰减
-4. **实验性最多 1/天**：每天拍 2 条时至少 1 条是稳分。**不要全实验**——冷启动期实验失败率太高，伤校准节奏
+**Key constraints** (apply at every color):
+- No more than 2 consecutive pieces in the same category
+- Do not recommend candidates already published (marked done)
+- Do not recommend a candidate the user actively skipped (marked skip) for 6 months
 
 ---
 
-## 标准化"今日工作流"模板
+## Cadence meta-rules
 
-### 情况 1：buffer 充足 + 没到 T+3d 复盘
+In priority order (high → low):
 
-```
-SessionStart 报告 → user 决定拍/不拍
-├─ 拍 → "推荐选题" → cheat-recommend 推 2 个 →
-│       user 选 → /cheat-seed 写 draft (cold-start) 或 user 自己写 →
-│       user 改写 → script.md → user 拍 → "拍了 videos/<...>/" → cheat-shoot
-└─ 不拍 → 等
-```
+1. **Buffer beats scoring**: during a red warning, do not slip a publish date waiting for "a better topic" — shooting a composite 7.5 safe bet is safer than "waiting for tomorrow's 9.0"
+2. **Retro beats new shooting**: on the day T+RETRO_WINDOW_DAYS comes due, **retro first, then consider shooting** — otherwise the data signal is lost and rubric calibration suffers
+3. **Publishing beats backlog**: when the buffer is full (blue), stop shooting and publish what you have — the timeliness of already-shot topics decays
+4. **At most 1 experiment per day**: when shooting 2 pieces in a day, at least 1 must be a safe bet. **Do not go all-experiment** — during cold-start the experiment failure rate is too high and damages the calibration cadence
 
-### 情况 2：buffer 充足 + 到 T+3d 复盘
+---
 
-```
-SessionStart 报告含 ⏰ 复盘提醒 → user 给 video URL 或粘数据 →
-cheat-retro 自动跑 → 写复盘段 → 检查 bump 触发条件
-├─ 触发 → 提议 /cheat-bump（不强制，用户决定）
-└─ 未触发 → 等下个验证样本
-```
+## Standard "today's workflow" templates
 
-### 情况 3：buffer 红色警戒
+### Case 1: buffer is sufficient + no T+3d retro due
 
 ```
-🔴 SessionStart 第一行警戒 → user 决定
-├─ 拍 → cheat-recommend 只推 v 当前 top 1 稳分 → 立即拍
-└─ 接受断更风险 → user 自负，cheat-status 持续提示
+SessionStart report → user decides whether to shoot
+├─ Shoot → "recommend topic" → cheat-recommend proposes 2 →
+│          user picks → /cheat-seed writes draft (cold-start) or user writes it →
+│          user revises → script.md → user shoots → "shot videos/<...>/" → cheat-shoot
+└─ Don't shoot → wait
 ```
 
-### 情况 4：buffer 蓝色积压
+### Case 2: buffer is sufficient + a T+3d retro is due
 
 ```
-🔵 SessionStart 报告"积压" → user 决定
-├─ 发 → "已发布 https://..." → cheat-publish → buffer -1
-├─ 复盘 → 见情况 2
-└─ 拍新 → cheat-recommend 拒绝："你 buffer 已 N 条，先发掉 ≤3 条再来"
+SessionStart report includes ⏰ retro reminder → user supplies video URL or pastes data →
+cheat-retro runs automatically → writes retrospective section → checks bump triggers
+├─ Triggered → propose /cheat-bump (not mandatory; user decides)
+└─ Not triggered → wait for the next validation sample
 ```
 
-### 情况 5：周期性集中处理日（用户主动触发）
+### Case 3: buffer red warning
 
 ```
-user 说"抓热点" → cheat-trends → 候选池更新
-+ user 说"看看 rubric 是不是该升了" → cheat-status 检查同向偏差累计
-+ user 说"看看 rubric_notes 行数" → cheat-status 健康度检查
+🔴 First line of SessionStart is a warning → user decides
+├─ Shoot → cheat-recommend only proposes the current safe-bet top 1 → shoot immediately
+└─ Accept the risk of slipping → user's call; cheat-status keeps reminding
+```
+
+### Case 4: buffer blue backlog
+
+```
+🔵 SessionStart report says "backlogged" → user decides
+├─ Publish → "shipped https://..." → cheat-publish → buffer -1
+├─ Retro → see Case 2
+└─ Shoot new → cheat-recommend refuses: "your buffer already has N pieces; publish down to ≤3 first"
+```
+
+### Case 5: periodic batch day (user-triggered)
+
+```
+user says "fetch trends" → cheat-trends → candidate pool updated
++ user says "check whether the rubric should be bumped" → cheat-status checks cumulative same-direction bias
++ user says "check rubric_notes line count" → cheat-status health check
 ```
 
 ---
 
-## 兜底：流程偏离时
+## Fallback: when the process drifts
 
-如果某天违反节奏（buffer=0 但用户强行不拍 / 积压 ≥10 但用户继续拍），SessionStart 报告**显式标注**：
-
-```
-❌ 你已 N 天没发新内容（最后一次发布：YYYY-MM-DD），
-   buffer = 0，你的频道目前处于"事实断更"状态
-```
-
-或：
+If one day the cadence is violated (buffer=0 but the user refuses to shoot / backlog ≥10 but the user keeps shooting), the SessionStart report **explicitly labels it**:
 
 ```
-❌ 你 buffer 已 N 条但还在新拍，
-   过去 N 条里有 N 条已超过 X 天未发——存在时效性流失风险
+❌ You have not published anything new for N days (last publish: YYYY-MM-DD),
+   buffer = 0, your channel is currently in a state of "de facto hiatus"
 ```
 
-**不会自动尝试补救**——只显式报告，由 user 决定如何回到节奏。
+or:
+
+```
+❌ Your buffer already has N pieces but you are still shooting new ones,
+   N of the last N pieces have gone unpublished for more than X days — timeliness decay risk
+```
+
+**It will not automatically try to fix anything** — it only reports explicitly; the user decides how to get back on cadence.
 
 ---
 
-## 子 skill 责任表
+## Sub-skill responsibility table
 
-| Skill | 节奏责任 |
+| Skill | Cadence responsibility |
 |---|---|
-| `/cheat-init` | 问 cadence；写 `target_publish_cadence_days`；装 SessionStart hook |
-| `/cheat-shoot` | 把 video folder 加 state.shoots，buffer +1 |
-| `/cheat-publish` | 从 state.shoots 移除对应项，buffer -1 |
-| `/cheat-status` | 计算 buffer + 颜色，输出报告 |
-| `/cheat-recommend` | 按 buffer 颜色 + 选题策略给推荐 |
-| `/cheat-retro` | 复盘后更新 STATUS（自动 trigger /cheat-status） |
-| SessionStart hook | 调 /cheat-status 渲染 4-6 行报告，写到 STATUS.md |
+| `/cheat-init` | Ask for cadence; write `target_publish_cadence_days`; install the SessionStart hook |
+| `/cheat-shoot` | Add the video folder to state.shoots, buffer +1 |
+| `/cheat-publish` | Remove the matching item from state.shoots, buffer -1 |
+| `/cheat-status` | Compute buffer + color, output the report |
+| `/cheat-recommend` | Recommend by buffer color + topic strategy |
+| `/cheat-retro` | Update STATUS after the retro (auto-trigger /cheat-status) |
+| SessionStart hook | Call /cheat-status to render a 4-6 line report and write it to STATUS.md |
 
 ---
 
-## 关键差异：cheat-on-content vs 视频分析
+## Key differences: cheat-on-content vs the video-analysis project
 
-| 维度 | 视频分析 | cheat-on-content |
+| Dimension | Video analysis | cheat-on-content |
 |---|---|---|
-| Cadence 来源 | 默认日更（CADENCE.md 硬编码） | 用户自填（cheat-init 问，4 档：日/隔日/周/灵活） |
-| Buffer 阈值 | 0/1/2/3-5/6+（按"篇"）| 0/1-2/3-5/>5（按"buffer_days"——按用户 cadence 派生） |
-| 推荐 2 条策略 | 1 稳 + 1 实验 | 同 |
-| SessionStart 报告 | CLAUDE.md 文字约束 + Claude 自觉 | hook 强制 + Claude 读 hook 输出 |
+| Cadence source | Defaults to daily (hardcoded in CADENCE.md) | User-supplied (cheat-init asks; 4 options: daily / every other day / weekly / flexible) |
+| Buffer thresholds | 0/1/2/3-5/6+ (by "pieces") | 0/1-2/3-5/>5 (by "buffer_days" — derived from the user's cadence) |
+| 2-topic strategy | 1 safe + 1 experiment | Same |
+| SessionStart report | CLAUDE.md text constraint + Claude's self-discipline | Hook-enforced + Claude reads the hook output |

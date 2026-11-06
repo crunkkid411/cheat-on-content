@@ -1,155 +1,155 @@
-# Rubric Bump Validation Protocol（升级验证协议）
+# Rubric Bump Validation Protocol
 
-被这些子 skill 引用：`cheat-bump`、主 SKILL.md。
+Referenced by these sub-skills: `cheat-bump`, and the main SKILL.md.
 
-这是项目原则 #2 的完整规范——**升级 = 全量重打**。任何对 rubric 的结构性变更都必须走完本协议。
-
----
-
-## "升级"的定义
-
-下列任一变更触发完整 bump 流程：
-
-- 公式系数变化（ER×1.5 → ×2.0）
-- 维度增减（删 NA，加 MS）
-- 维度定义颠覆性改写（"QL=金句数量" → "QL=可挪用句式")
-- 归一化常数变化（除数从 8.5 → 9.0）
-
-下列变更**不**触发 bump，但要在 `rubric_notes.md` 标注：
-- 维度定义边际细化（QL=5 的门槛从"≥3 句"细化为"≥3 句且分布在不同段")
-- 单维度门槛变严的备注（不改公式，只改打分时的判断习惯）
-- 锚点样本更新（用新样本作为 5 分标杆）
+This is the full specification of project principle #2 — **a bump = a full re-score**. Every structural change to the rubric must go through this protocol.
 
 ---
 
-## 何时**可以**提议升级（**Claude 判断为主，下面是参考触发场景**）
+## Definition of a "bump"
 
-任一成立即可提议——但**最终是 Claude 判断观察的成熟度 + 信号强度**，下面只是 default heuristic：
+Any of the following changes triggers the full bump process:
 
-1. 某个跨样本观察出现**清晰、可追溯到具体数据点的支持模式**（默认参考 ≥3 样本，但 Claude 可以基于 1-2 个**特别强**的样本提议——如 6x 流量比 / 单一模因 ≥2000 赞这种异常信号）
-2. 当前 rubric 在最近复盘中**系统性偏向同一方向**（默认参考 ≥3 次同向，但 Claude 可以基于 1-2 次**极端偏离**提议——如中枢 50w 实绩 5w 这种 10x 偏差）
-3. 某候选维度展示了独立预测力（参考样本数：≥3 是稳，但 1-2 个强证据也算）
-4. 校准池跨过某分水岭（5 / 10 / 20 / 50）触发常规复审
+- A change to a formula coefficient (ER×1.5 → ×2.0)
+- Adding or removing a dimension (drop NA, add MS)
+- A disruptive rewrite of a dimension definition ("QL = number of quotable lines" → "QL = reusable sentence patterns")
+- A change to the normalization constant (divisor 8.5 → 9.0)
 
-**Claude 提议 bump 时必须显式标注**：本次提议是 default-aligned（满足上面常规门槛）还是 judgment-driven（基于强信号但样本少）。让用户审视依据。
-
----
-
-## 何时**禁止**提议升级
-
-下面是**硬约束**——Claude 不能突破：
-
-- 当前正处于 in-progress prediction（state file `in_progress_session != null`）—— 流程纪律
-- 上次 bump 后没有任何新校准样本——必须至少 1 个新样本才能再次 bump（避免循环验证自己）
-
-下面是**软建议**——Claude 通常应避免，但有强理由可以打破并显式标注：
-
-- 校准池 < 5 样本时一般不 bump（除非出现强反例）
-- 上次 bump 距今 < 3 篇新校准样本时一般不 bump（除非新样本含强反例）
-
-**Claude 软违反时必须：**
-1. 在提议中显式说明"我知道默认建议等到 N≥5 / 等到 ≥3 篇新样本，但本次原因是 [X 强信号]"
-2. 仍走完整 5 步验证流程（包括跨模型审核）
-3. 跨模型审核如果 REJECT → bump 被拒，**不允许"我觉得信号强"绕过**
+The following changes do **not** trigger a bump, but must be annotated in `rubric_notes.md`:
+- Marginal refinement of a dimension definition (the threshold for QL=5 changes from "≥3 lines" to "≥3 lines distributed across different sections")
+- A note that a single-dimension threshold has become stricter (no formula change, only the judgment habit at scoring time)
+- Updating anchor samples (using a new sample as the 5-point benchmark)
 
 ---
 
-## 完整升级流程（强制 5 步，不允许跳步）
+## When a bump **may** be proposed (**Claude judges; the following are reference triggers**)
 
-### Step 1：写出新公式的完整方程
+Any one is enough to propose — but **the final call is Claude's judgment of observation maturity + signal strength**; the list below is only a default heuristic:
 
-不能只说"ER 权重提高"，必须把整个方程完整写出，所有系数和归一化常数。
+1. A cross-sample observation shows a **clear support pattern traceable to specific data points** (default reference: ≥3 samples, but Claude may propose based on 1-2 **exceptionally strong** samples — e.g. a 6x traffic ratio / a single meme with ≥2,000 likes)
+2. The current rubric has been **systematically biased in the same direction** in recent retros (default reference: ≥3 same-direction misses, but Claude may propose based on 1-2 **extreme deviations** — e.g. a 500k center vs 50k actual, a 10x miss)
+3. A candidate dimension shows independent predictive power (reference sample count: ≥3 is solid, but 1-2 strong pieces of evidence also count)
+4. The calibration pool crosses a milestone (5 / 10 / 20 / 50), triggering a routine review
 
-示例（合规）：
+**When Claude proposes a bump it must explicitly label** whether the proposal is default-aligned (meets the routine thresholds above) or judgment-driven (based on a strong signal but few samples). Let the user inspect the basis.
+
+---
+
+## When a bump is **forbidden**
+
+The following are **hard constraints** — Claude cannot break them:
+
+- A prediction is currently in progress (`state file in_progress_session != null`) — process discipline
+- There have been no new calibration samples since the last bump — at least 1 new sample is required before another bump (avoid validating yourself in a loop)
+
+The following are **soft recommendations** — Claude should normally avoid them, but may break them with a strong reason and explicit labeling:
+
+- Do not normally bump when the calibration pool is < 5 samples (unless a strong counterexample appears)
+- Do not normally bump when fewer than 3 new calibration samples have arrived since the last bump (unless the new samples contain a strong counterexample)
+
+**When Claude breaks a soft rule, it must:**
+1. Explicitly state in the proposal: "I know the default recommendation is to wait for N≥5 / ≥3 new samples, but this time the reason is [X strong signal]"
+2. Still run the full 5-step validation process (including cross-model audit)
+3. If the cross-model audit returns REJECT → the bump is rejected; **"I think the signal is strong" is not allowed to bypass it**
+
+---
+
+## Full bump process (mandatory 5 steps, no skipping)
+
+### Step 1: Write the complete equation of the new formula
+
+You cannot just say "increase the ER weight"; you must write the entire equation, all coefficients, and the normalization constant.
+
+Example (compliant):
 ```
 v2.0  composite = (ER×1.5 + SR×1.5 + HP×1.5 + QL + NA + AB + SAT) / 8.5 × 2.0
 v2.1  composite = (ER×2.0 + HP×1.5 + MS×1.5 + QL + SR + TS + SAT) / 9.0 × 2.0
 ```
 
-示例（违规）：
-- "把 ER 权重提到 2.0" ← 没说其他权重是否变
-- "加 MS 维度" ← 没说权重和归一化常数
+Examples (non-compliant):
+- "Raise the ER weight to 2.0" ← does not say whether the other weights change
+- "Add an MS dimension" ← does not state the weight or normalization constant
 
-### Step 2：在校准池上**本地**全量重打分
+### Step 2: **Locally** re-score the entire calibration pool
 
-校准池定义：`predictions/*.md` 中所有有完整复盘段（含 `actual_*` 数据）的文件。
+Calibration pool definition: every file under `predictions/*.md` that has a complete retrospective section (including `actual_*` data).
 
-每篇用新公式重新算 composite。**不重新打各维度分数**——维度分数不变（v2 的 ER=5 在 v2.1 也是 ER=5），只重算综合分。
+Recompute the composite for each piece with the new formula. **Do not re-score the dimension scores** — dimension scores stay the same (v2's ER=5 is still ER=5 under v2.1); only the composite is recomputed.
 
-例外：如果新公式增加了维度（如新增 MS），那对每个老样本必须**回追打 MS 分**。这一步会让升级成本随样本数线性上升，是设计上的"升级阻尼"。
+Exception: if the new formula adds a dimension (e.g. new MS), you must **backfill an MS score** for every old sample. This step makes the cost of a bump rise linearly with the sample count — an intentional "bump damping".
 
-### Step 3：计算排序一致性
+### Step 3: Compute ranking consistency
 
-新 composite 排序 vs 各样本实绩 bucket 排序，必须满足：
-- 在 ≥`THRESHOLD` 比例样本上一致（默认 4/5 = 80%）
-- 不能把旧公式做对的任一对样本顺序搞反（pairwise no-regression）
+The new composite ranking vs the ranking of samples by actual-performance bucket must satisfy:
+- Agreement on ≥`THRESHOLD` proportion of samples (default 4/5 = 80%)
+- No pair of samples that the old formula ordered correctly may be reversed (pairwise no-regression)
 
-排序一致性的算法：
-1. 用新 composite 给所有校准样本排序
-2. 用 actual_plays 给所有样本排序
-3. 计算 Spearman rank correlation；同时检查每对 (i, j) 的相对顺序是否颠倒
-4. 输出对照表：每个样本的 [新 rank, actual rank, delta]
+Algorithm for ranking consistency:
+1. Rank all calibration samples by new composite
+2. Rank all samples by actual_plays
+3. Compute Spearman rank correlation; also check whether the relative order of every pair (i, j) is reversed
+4. Output a comparison table: each sample's [new rank, actual rank, delta]
 
-### Step 4：跨模型独立审核（**强制**，除非 escape hatch）
+### Step 4: Independent cross-model audit (**mandatory**, unless the escape hatch is used)
 
-`CROSS_MODEL_AUDIT=true`（默认）时：
-1. 调用 `mcp__llm-chat__chat`，把以下打包发给外部 LLM：
-   - 旧公式 + 新公式
-   - 校准池所有样本的：维度分数、composite（新+旧）、actual_plays、actual_likes、actual_comments、actual_shares
-   - Step 3 的排序对照表
-2. 外部 LLM 独立判定两件事：
-   - 排序一致性是否真的 ≥ THRESHOLD？
-   - 新公式相比旧公式是否解释力更强？
-3. 外部 LLM 必须输出 **PASS** / **REJECT** + ≥ 100 字理由
-4. 本地判定与外部判定**两个都通过**才能进入 Step 5
+When `CROSS_MODEL_AUDIT=true` (default):
+1. Call `mcp__llm-chat__chat` with the following package sent to the external LLM:
+   - The old formula + the new formula
+   - For every calibration-pool sample: dimension scores, composite (new + old), actual_plays, actual_likes, actual_comments, actual_shares
+   - The ranking comparison table from Step 3
+2. The external LLM independently judges two things:
+   - Is ranking consistency really ≥ THRESHOLD?
+   - Does the new formula explain more than the old one?
+3. The external LLM must output **PASS** / **REJECT** + a reason of ≥ 100 words
+4. Both the local judgment and the external judgment must **pass** before Step 5
 
-`CROSS_MODEL_AUDIT=false`：跳过外部审核——**仅在离线/无网时使用**。state file 标记 `last_bump_self_audited: true`，`cheat-status` 持续提示用户配置外部审核。
+`CROSS_MODEL_AUDIT=false`: skip the external audit — **only for offline / no-network use**. The state file marks `last_bump_self_audited: true`, and `cheat-status` keeps reminding the user to configure an external audit.
 
-### Step 5：升级后清算（Cleanup pass）
+### Step 5: Post-bump cleanup pass
 
-bump 落地必须一次性完成：
+The bump must land in one pass:
 
-1. 在 `rubric_notes.md` 顶部更新 `**当前版本**` 和**版本速查表**新增一行
-2. 在 `rubric-memo.md` 追加"vN → vN+1 升级 Memo" 段写完整 memo（含触发观察 + 证据数据 + 诊断 + 新公式 + 已知局限）。⚠️ 不写入 `rubric_notes.md`——它是 blind sub-agent 白名单，含实绩数据会污染盲评通道
-3. 删除驱动本次升级、且已被吸收为正式维度的所有"观察记录"段条目
-4. 删除升级过程中被推翻的"观察记录"段条目
-5. 仍未解决的"观察记录"段条目 → 移到新版本的"待验证假设"段（保留）
-6. 更新所有校准样本的 prediction 文件**底部**追加一行：`**Re-scored under <new-version> on YYYY-MM-DD**: composite=X.XX → Y.YY`（不动预测段、不动复盘段，只追加这一行）
+1. Update `**Current version**` at the top of `rubric_notes.md` and add a row to the **version quick-reference table**
+2. Append a "vN → vN+1 bump memo" section to `rubric-memo.md` with the full memo (trigger observations + evidence data + diagnosis + new formula + known limitations). ⚠️ Do not write this into `rubric_notes.md` — that file is the blind sub-agent's whitelist, and including actual-performance data would contaminate the blind scoring channel
+3. Delete every "observation log" entry that drove this bump and has now been absorbed into a formal dimension
+4. Delete every "observation log" entry refuted during the bump
+5. Any "observation log" entry still unresolved → move it to the new version's "hypotheses to verify" section (keep it)
+6. Append one line to the **bottom** of every calibration sample's prediction file: `**Re-scored under <new-version> on YYYY-MM-DD**: composite=X.XX → Y.YY` (do not touch the prediction section or retrospective section; append only this line)
 
-清算不是可选的。rubric_notes.md 是工作台，不是博物馆——见 `observation-lifecycle.md`。
+Cleanup is not optional. rubric_notes.md is a workbench, not a museum — see `observation-lifecycle.md`.
 
 ---
 
-## bump 被拒后的处理
+## Handling a rejected bump
 
-任一步失败 → bump 拒绝，按下列规范处理：
+If any step fails → the bump is rejected, handled as follows:
 
-| 失败位置 | 处理 |
+| Failure point | Handling |
 |---|---|
-| Step 3 本地排序不一致 | 候选公式回到"待验证"区。**不允许**默默放宽 THRESHOLD（如从 4/5 改到 3/5）—— 那是诚实的 self-deception。THRESHOLD 是协议刚性，与"何时可以提议 bump"的样本数门槛不同（后者可以软违反） |
-| Step 4 外部审核 REJECT | 把外部 LLM 的理由完整记录到 `rubric-memo.md` 的"被拒升级 log"段 |
-| Step 4 外部审核与本地判定冲突（一个 PASS 一个 REJECT） | 视为 REJECT。冲突意味着至少一方对数据的解读不稳定，不应升级 |
-| Step 5 清算无法完成（如某观察既不能删也不能保留） | bump 回滚到 step 0。Note：这意味着新公式还有未捕获的"未解决观察"，方案不成熟 |
+| Step 3 local ranking inconsistency | The candidate formula goes back to the "to verify" area. Silently relaxing THRESHOLD (e.g. 4/5 → 3/5) is **not allowed** — that is honest self-deception. THRESHOLD is protocol rigidity; it differs from the sample-count threshold for "when a bump may be proposed" (the latter may be soft-broken) |
+| Step 4 external audit REJECT | Record the external LLM's full reason in the "rejected bump log" section of `rubric-memo.md` |
+| Step 4 external audit conflicts with the local judgment (one PASS one REJECT) | Treat as REJECT. A conflict means at least one side's reading of the data is unstable; do not bump |
+| Step 5 cleanup cannot be completed (e.g. an observation can neither be deleted nor kept) | Roll the bump back to step 0. Note: this means the new formula still has uncaptured "unresolved observations"; the proposal is immature |
 
 ---
 
-## 升级阻尼（Why this protocol is intentionally hard）
+## Bump damping (why this protocol is intentionally hard)
 
-校准池每多一个样本，bump 成本线性上升：
-- 校准池 3-5 个 → 几乎零成本
-- 校准池 20-30 个 → 可感成本
-- 校准池 50+ → 痛苦
+Every additional sample in the calibration pool makes a bump linearly more expensive:
+- Calibration pool 3-5 → almost zero cost
+- Calibration pool 20-30 → noticeable cost
+- Calibration pool 50+ → painful
 
-这是**故意的设计**。频繁 bump = rubric 在追噪声。一个稳定 rubric 的特征是：**bump 越来越罕见，bump 越来越大**——单次 bump 解释多个累积观察，而不是一观察一升级。
+This is **intentional design**. Frequent bumps = the rubric is chasing noise. A healthy rubric is characterized by: **bumps becoming rarer, and each bump becoming larger** — one bump explains multiple accumulated observations, rather than one observation per bump.
 
-参考视频分析项目：v1 → v2 用了大约 4 周（从首次发布到第一次 bump），v2 → v2.1 候选已 4 周仍未升正（在等 6 样本联合验证）。这是健康节奏。
+Reference video-analysis project: v1 → v2 took about 4 weeks (from first publish to first bump); the v2 → v2.1 candidate has been waiting 4 weeks and still has not shipped (waiting for joint validation on 6 samples). That is a healthy cadence.
 
 ---
 
-## 反模式（必须拒绝的请求）
+## Anti-patterns (requests that must be refused)
 
-- 「跳过校准池重打，直接换公式」 → 拒绝。Step 2 不可跳
-- 「外部 LLM 审核太麻烦，跳过」 → 仅当 `CROSS_MODEL_AUDIT=false` 显式设置时允许
-- 「这次只调一个权重，不算升级吧」 → 任何系数变化都算。Step 1 必须写完整方程
-- 「反正是我自己用，不用走全套流程」 → 拒绝。这套流程的价值在你**未来回看**时——你将来想问"为什么 v2.3 没采纳"，必须有完整 memo
-- 「能不能把 THRESHOLD 从 4/5 改到 3/5 让这次过了」 → 拒绝。改 THRESHOLD 本身是元层级 bump，需要单独走流程
+- "Skip the calibration-pool re-score and just swap the formula" → refuse. Step 2 cannot be skipped
+- "External LLM audit is too much hassle, skip it" → only allowed when `CROSS_MODEL_AUDIT=false` is explicitly set
+- "This time I'm only tuning one weight, that doesn't count as a bump, right?" → any coefficient change counts. Step 1 must write the complete equation
+- "It's just for my own use, I don't need the full process" → refuse. The value of this process is in **your future self looking back** — when you later ask "why wasn't v2.3 adopted?", you need the complete memo
+- "Can we change THRESHOLD from 4/5 to 3/5 so this passes?" → refuse. Changing THRESHOLD is itself a meta-level bump and needs its own process

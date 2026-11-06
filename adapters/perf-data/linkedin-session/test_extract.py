@@ -1,10 +1,10 @@
-"""extract.py 的单元测试。用合成样本（不提交真实指标）。
+"""Unit tests for extract.py. Uses synthetic samples (no real metrics are committed).
 
-跑：python test_extract.py
+Run: python test_extract.py
 """
 from extract import _to_int, parse_post_meta, parse_post_summary
 
-# 合成样本：复刻真实 /analytics/post-summary/ 的 inner_text 版式（日文界面），数字是假的。
+# Synthetic sample: reproduces the real /analytics/post-summary/ inner_text layout (Japanese UI); the numbers are fake.
 POST_SAMPLE_JP = """Heqing Huangさんが投稿しました • 4日
 post body line one
 post body line two with a stray number 123 inside
@@ -34,7 +34,7 @@ LinkedInでの送信数
 上位統計データ
 """
 
-# 英文界面（LinkedIn 随机切换）。
+# English UI (LinkedIn switches randomly).
 POST_SAMPLE_EN = """Heqing Huang posted this • 6d
 post body text with stray number 999
 Discovery
@@ -110,7 +110,7 @@ def test_parse_post_meta_jp():
     assert meta["age"] == "4日", meta
     assert "post body line one" in meta["text"], meta
     assert "post body line two" in meta["text"], meta
-    # 正文不应吃进指标小标题 / 指标
+    # The body must not swallow the metrics subheading / metrics
     assert "調査" not in meta["text"], meta
     assert "インプレッション数" not in meta["text"], meta
 

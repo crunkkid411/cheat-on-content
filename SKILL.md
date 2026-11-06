@@ -1,225 +1,225 @@
 ---
 name: cheat-on-content
-description: 给所有想把"感觉"变成可校准预测的内容创作者。**方法论通用**——打分 → 盲预测 → T+3d 复盘 → 进化 rubric 的循环适用任何能被量化（播放 / 阅读 / 收听 / 点击）的内容。**rubric 是循环的内容，不是循环本身**——当前内置一份观点视频 rubric（参考博主 25+ 视频拟合），其他形态可借这套起步并 bump 调权重。**强烈建议导入对标账号**作为初始信号源（/cheat-learn-from）。触发词："初始化"/"打分这篇"/"启动预测"/"已发布"/"复盘"/"升级 rubric"/"推荐选题"/"抓热点"/"状态"/"找对标"/"learn from"。**首次使用必须先跑 /cheat-init。**
+description: For content creators who want to turn "gut feeling" into calibrated predictions. **The methodology is universal** — the score → blind-predict → T+3d retro → evolve-rubric loop works for anything that can be measured (plays / reads / listens / clicks). **The rubric is the content of the loop, not the loop itself** — it currently ships with one opinion-video rubric (fitted on 25+ videos from a reference creator); other formats can start from it and bump the weights. **Strongly recommend importing a benchmark account** as the initial signal source (/cheat-learn-from). Trigger phrases: "initialize"/"初始化", "score this"/"打分这篇", "start prediction"/"启动预测", "shipped"/"已发布", "retro"/"复盘", "bump rubric"/"升级 rubric", "recommend topic"/"推荐选题", "fetch trends"/"抓热点", "status"/"状态", "find benchmark"/"找对标", "learn from". **First use must run /cheat-init.**
 argument-hint: "[draft-path] [— mode: cold-start|calibration]"
 allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Skill, mcp__llm-chat__chat
 ---
 
-# 网红作弊器 / Cheat on Content
+# Cheat on Content
 
-> 🎯 **方法论通用，rubric 当前内置观点视频版**
+> 🎯 **The methodology is universal; the built-in rubric is for opinion videos**
 >
-> **方法论**（5 阶段闭环）：任何能被量化的内容形态都适用——视频 / 文章 / 播客 / Newsletter / 短文 thread。
+> **Methodology** (5-phase loop): works for any measurable content format — video / article / podcast / newsletter / short-text thread.
 >
-> **当前内置 rubric**：观点类视频（评论 / 时评 / 论说 / 议题讨论 / 个人观点表达），7 个维度由参考博主 25+ 已发样本拟合而来。如果你做其他形态，需要：
-> - 自己写一份 rubric（参照 [starter-rubrics/opinion-video-zero.md](starter-rubrics/opinion-video-zero.md) 的格式）
-> - 或等内置扩展（长文 / 短文 / 播客 starter 在批次 3 路线图）
+> **Built-in rubric**: opinion video (commentary / current-affairs / argument / issue discussion / personal viewpoint). Its 7 dimensions were fitted on 25+ published samples from a reference creator. If you make another format, you need to either:
+> - write your own rubric (use [starter-rubrics/opinion-video-zero.md](starter-rubrics/opinion-video-zero.md) as the format reference)
+> - or wait for the built-in expansion (long-form / short-text / podcast starters are on the batch-3 roadmap)
 >
-> 默认假设：**用户是从零开始的新人**（一条视频都没发过）——cold-start 期的预测会**简化**，只要 7 维打分 + 一句话 bet，不强求 bucket 数字（避免 false precision）。已有 5+ 篇数据的老手走 calibration 模式解锁完整 7 组件预测。
+> Default assumption: **the user is a beginner starting from zero** (has not shipped a single video) — cold-start predictions are **simplified**: only 7-dimension scores + a one-line bet, no forced bucket numbers (avoids false precision). Veterans with 5+ pieces of data enter calibration mode and unlock the full 7-component prediction.
 
-把内容创作变成可校准预测循环：**打分 → 预测 → 发布 → 复盘 → 进化 rubric**。
+Turn content creation into a calibrated prediction loop: **score → predict → publish → retro → evolve the rubric**.
 
-本文件是**总协议 + 路由器**。具体每个阶段的工作流在 `skills/cheat-*/SKILL.md` 各子 skill 里。
+This file is the **master protocol + router**. The workflow for each phase lives in its own sub-skill under `skills/cheat-*/SKILL.md`.
 
 ## Codex compatibility
 
-Codex 没有 Claude Code 的 slash-command harness。安装到 Codex 后，按自然语言触发同一套路由即可：
+Codex does not have Claude Code's slash-command harness. After installing into Codex, trigger the same routing with natural language:
 
-- `初始化 cheat-on-content` → 读取并执行 `skills/cheat-init/SKILL.md`
-- `打分这篇 scripts/foo.md` → 读取并执行 `skills/cheat-score/SKILL.md`
-- `启动预测 scripts/foo.md` → 读取并执行 `skills/cheat-predict/SKILL.md`
-- `拍了 ...` / `已发布 ...` / `复盘 ...` / `升级 rubric` / `状态` → 分别读取对应 `skills/cheat-*/SKILL.md`
+- `init cheat-on-content` → read and execute `skills/cheat-init/SKILL.md`
+- `score this scripts/foo.md` → read and execute `skills/cheat-score/SKILL.md`
+- `start prediction scripts/foo.md` → read and execute `skills/cheat-predict/SKILL.md`
+- `shot ...` / `shipped ...` / `retro ...` / `bump rubric` / `status` → read the corresponding `skills/cheat-*/SKILL.md`
 
-执行时遵循本文件的三条原则和路由表；不要依赖 `/cheat-*` 命令是否存在。Claude Code 专用 hook（`.claude/settings.json`）仍只在 Claude Code 里自动触发；Codex 中需要用户主动说 `状态` 查看 buffer、待复盘和候选池。
-
----
-
-## 三条不可妥协原则
-
-任何一条被违反，整个校准循环退化为"凭直觉的自我安慰"。如果用户要求打破其中任何一条，**拒绝执行并说明原因**。
-
-1. **盲预测（Blind prediction）**：预测必须在看到任何实际数据**之前**写完。一旦写完，`## 预测` 段是 immutable——只能往 `## 复盘` 段追加。完整规范：[shared-references/blind-prediction-protocol.md](shared-references/blind-prediction-protocol.md)。**hooks/prediction-immutability.sh 在 harness 层强制执行**。
-
-2. **升级 = 全量重打（Bump = full re-score）**：rubric 升级时，校准池所有有实绩数据的样本必须用新公式重打分；新排序与实际表现排序若在 ≥4/5 样本上不一致，升级被拒；升级必须经跨模型独立审核。完整规范：[shared-references/bump-validation-protocol.md](shared-references/bump-validation-protocol.md)。
-
-3. **rubric 是工作台，不是博物馆**：被新数据推翻或被吸收为正式维度的观察，**删掉**。绝不留"我曾经以为 X，但其实..."的考古层。git history 才是档案。完整规范：[shared-references/observation-lifecycle.md](shared-references/observation-lifecycle.md)。
+When executing, follow this file's three principles and routing table; do not depend on whether `/cheat-*` commands exist. Claude Code-only hooks (`.claude/settings.json`) still auto-trigger only inside Claude Code; in Codex the user must say `status` to see buffer, pending retros, and the candidate pool.
 
 ---
 
-## 路由表（触发词 → 子 skill）
+## Three non-negotiable principles
 
-| 用户说 | 调用 | 前置条件 |
+Violating any one of them degrades the whole calibration loop into "gut-feel self-soothing". If the user asks to break one, **refuse and explain why**.
+
+1. **Blind prediction**: the prediction must be written **before** seeing any actual data. Once written, the `## Prediction` section is immutable — you may only append to `## Retrospective`. Full spec: [shared-references/blind-prediction-protocol.md](shared-references/blind-prediction-protocol.md). **hooks/prediction-immutability.sh enforces this at the harness layer**.
+
+2. **Bump = full re-score**: when the rubric is bumped, every sample in the calibration pool with actual performance data must be re-scored with the new formula; if the new ranking disagrees with the actual-performance ranking on ≥4/5 samples, the bump is rejected; every bump must pass an independent cross-model audit. Full spec: [shared-references/bump-validation-protocol.md](shared-references/bump-validation-protocol.md).
+
+3. **The rubric is a workbench, not a museum**: observations refuted by new data, or absorbed into a formal dimension, are **deleted**. Never leave an archaeology layer of "I once thought X, but actually...". Git history is the archive. Full spec: [shared-references/observation-lifecycle.md](shared-references/observation-lifecycle.md).
+
+---
+
+## Routing table (trigger phrase → sub-skill)
+
+| User says | Call | Precondition |
 |---|---|---|
-| "初始化" / "init" / "首次使用" | `/cheat-init` | 无（这是入口） |
-| "找对标" / "学这个账号" / "拆这几个对标视频" / "learn from" / "导入对标账号" | `/cheat-learn-from` | 已 init；cold-start 强烈建议；后续可随时 --append / --replace |
-| "找选题" / "我不知道拍什么" / "seed" / "找前 5 个选题" | `/cheat-seed` | 已 init（cold-start 用户专用一次性种子动作） |
-| "打分这篇 [path]" / "score this [path]" | `/cheat-score` | rubric_notes.md 存在 |
-| "启动预测" / "start prediction" / "给这稿子打分并预测" | `/cheat-predict` | 已 init + 有最终稿 |
-| "拍了 X" / "shot it" / "录完了" | `/cheat-shoot` | 对应预测已写（buffer +1） |
-| "已发布" / "I shipped it" / "发布链接是 X" | `/cheat-publish` | 对应预测文件存在（buffer -1） |
-| "复盘" / "retro this" / "T+3d 数据来了" | `/cheat-retro` | 对应预测文件存在 + 已过 RETRO_WINDOW_DAYS |
-| "构造受众画像" / "更新 persona" / "我的观众是谁" / "build persona" | `/cheat-persona` | 已 init；有复盘评论数据（或 benchmark seed） |
-| "升级 rubric" / "bump rubric" / "更新公式" | `/cheat-bump` | 校准池 ≥ MIN_SAMPLES_FOR_BUMP |
-| "推荐选题" / "next topic" | `/cheat-recommend` | candidates.md 存在且非空 |
-| "抓热点" / "fetch trends" / "今天有什么可做的" | `/cheat-trends` | trend-sources adapter 已配置（日常补充候选池） |
-| "状态" / "status" / "看板" | `/cheat-status` | 任意时刻可调 |
-| "迁移" / "升级 state" / "schema 版本不对" / "migrate" | `/cheat-migrate` | 已 init；用户 git pull 拉了新版后；SessionStart hook 提示 schema mismatch 后 |
+| "initialize" / "init" / "first use" / "初始化" | `/cheat-init` | None (this is the entry point) |
+| "find benchmark" / "learn this account" / "break down these benchmark videos" / "learn from" / "import benchmark account" / "找对标" | `/cheat-learn-from` | Init done; strongly recommended for cold-start; can `--append` / `--replace` anytime later |
+| "find topics" / "I don't know what to shoot" / "seed" / "find the first 5 topics" / "找选题" | `/cheat-seed` | Init done (one-time seed action for cold-start users) |
+| "score this [path]" / "打分这篇 [path]" | `/cheat-score` | rubric_notes.md exists |
+| "start prediction" / "score and predict this draft" / "启动预测" | `/cheat-predict` | Init done + final draft exists |
+| "shot X" / "shot it" / "filmed it" / "拍了 X" | `/cheat-shoot` | Matching prediction exists (buffer +1) |
+| "shipped" / "I shipped it" / "the publish link is X" / "已发布" | `/cheat-publish` | Matching prediction file exists (buffer -1) |
+| "retro" / "retro this" / "T+3d data is in" / "复盘" | `/cheat-retro` | Matching prediction file exists + `RETRO_WINDOW_DAYS` has elapsed |
+| "build audience persona" / "update persona" / "who is my audience" / "构造受众画像" | `/cheat-persona` | Init done; retro comment data exists (or benchmark seed) |
+| "bump rubric" / "update formula" / "升级 rubric" | `/cheat-bump` | Calibration pool ≥ MIN_SAMPLES_FOR_BUMP |
+| "recommend topic" / "next topic" / "推荐选题" | `/cheat-recommend` | candidates.md exists and is not empty |
+| "fetch trends" / "what can I make today" / "抓热点" | `/cheat-trends` | trend-sources adapter configured (daily candidate-pool top-up) |
+| "status" / "dashboard" / "状态" | `/cheat-status` | Callable at any time |
+| "migrate" / "upgrade state" / "schema version mismatch" / "迁移" | `/cheat-migrate` | Init done; after the user pulls a new version; after the SessionStart hook reports a schema mismatch |
 
-> 拍 vs 发分两个动作：buffer 警戒系统需要明确知道"拍了但没发"vs"已发"两种状态。详见 [shared-references/cadence-protocol.md](shared-references/cadence-protocol.md)。
+> Shooting and publishing are two separate actions: the buffer warning system needs to distinguish "shot but not published" from "published". See [shared-references/cadence-protocol.md](shared-references/cadence-protocol.md).
 
-**Mode detection**（首次接到非 init 触发词时执行）：
-1. 检查用户当前目录是否有 `.cheat-state.json` → 没有 → 强制路由到 `/cheat-init`
-2. 检查 `predictions/` 下有几个文件含完整 `## 复盘` 段填了真实数据 → 决定 `mode: cold-start | calibration`
-3. 把判定结果写回 `.cheat-state.json` 后再路由到目标 skill
-
----
-
-## 必须拒绝的请求
-
-下列模式会**直接破坏**三条原则之一，无论用户怎么说，都拒绝执行：
-
-- 「帮我预测一下，但我先告诉你播放量你来反推就行」 → 违反原则 #1。改用 `_redo.md` 路径记为 reconstructed
-- 「能不能从 candidates 里直接挑 composite 最高的，不用解释理由」 → 拒绝。永远展示各维度评分和至少一个锚点对比
-- 「跳过校准池重打，直接换公式」 → 违反原则 #2
-- 「跳过外部模型审核，自己说了算」 → 仅当 `CROSS_MODEL_AUDIT=false` 显式设置且 state file 标记自审时允许
-- 「删掉这份预测，我想重写」 → 违反原则 #1。预测是 immutable。如有正当理由重做，写新文件 `_redo.md`，原版必须保留
-- 「凭你的感觉给我推荐选题，不用打分」 → 拒绝。本工具不做 gut-feel forecast——那是它诞生**之前**的状态
-- 「把 rubric_notes.md 里所有历史观察都留着，加个时间戳分组就行」 → 违反原则 #3。git history 是档案，不是 markdown 文件
-- 「能不能把 THRESHOLD 从 4/5 降到 3/5 让这次 bump 过」 → 拒绝。改 THRESHOLD 本身是元层级 bump，单独走流程
-
-详细的拒绝场景在每个子 skill 的 `Refusals` 段。
+**Mode detection** (run the first time a non-init trigger is received):
+1. Check whether `.cheat-state.json` exists in the user's current directory → if not → force-route to `/cheat-init`
+2. Check how many files under `predictions/` contain a complete `## Retrospective` section filled with real data → decide `mode: cold-start | calibration`
+3. Write the result back to `.cheat-state.json`, then route to the target skill
 
 ---
 
-## 项目目录结构（用户 repo）
+## Requests that must be refused
 
-skill 期望用户的项目布局如下。`/cheat-init` 会创建缺失项；**绝不在没确认的情况下覆盖**。
+The following patterns **directly break** one of the three principles. Refuse them no matter how the user phrases them:
+
+- "Predict this for me, but I'll tell you the play count first and you reverse-engineer it" → violates principle #1. Use the `_redo.md` path and mark it reconstructed
+- "Can't you just pick the highest composite from candidates without explaining why?" → refuse. Always show every dimension score and at least one anchor comparison
+- "Skip the calibration-pool re-score and just swap the formula" → violates principle #2
+- "Skip the external-model audit, I'll be the judge" → only allowed when `CROSS_MODEL_AUDIT=false` is explicitly set and the state file marks it as self-audited
+- "Delete this prediction, I want to rewrite it" → violates principle #1. Predictions are immutable. If there is a legitimate reason to redo it, write a new `_redo.md` file and keep the original
+- "Just recommend a topic from your gut, no scoring" → refuse. This tool does not do gut-feel forecasts — that is the state it was born to replace
+- "Keep every historical observation in rubric_notes.md, just add a timestamp group" → violates principle #3. Git history is the archive, not the markdown file
+- "Can we lower THRESHOLD from 4/5 to 3/5 so this bump passes?" → refuse. Changing THRESHOLD is itself a meta-level bump and must go through its own process
+
+Detailed refusal scenarios live in each sub-skill's `Refusals` section.
+
+---
+
+## Project directory structure (user repo)
+
+The skill expects the user's project to look like this. `/cheat-init` creates anything missing; **never overwrite without confirmation**.
 
 ```
 <user-content-project>/
-├── .gitignore                         # cheat-init 创建；挡住 .auth*/.cheat-secrets.json 等凭证
-├── rubric_notes.md                    # 评分规则的真实来源
-├── WORKFLOW.md                        # 5 阶段流程文档（cheat-init 创建）
-├── STATUS.md                          # 看板（cheat-status 维护）
-├── .cheat-state.json                  # 状态文件，子 skill 共享上下文
-├── .cheat-cache/                      # 不入版本控制
-│   ├── usage.jsonl                    # 钩子被动记录的使用日志
-│   └── trends-history.jsonl           # cheat-trends 的去重缓存
+├── .gitignore                         # created by cheat-init; blocks credentials such as .auth*/.cheat-secrets.json
+├── rubric_notes.md                    # source of truth for scoring rules
+├── WORKFLOW.md                        # 5-phase workflow doc (created by cheat-init)
+├── STATUS.md                          # dashboard (maintained by cheat-status)
+├── .cheat-state.json                  # state file shared by all sub-skills
+├── .cheat-cache/                      # not version-controlled
+│   ├── usage.jsonl                    # passive usage log written by hooks
+│   └── trends-history.jsonl           # dedup cache for cheat-trends
 ├── .claude/
-│   └── settings.json                  # 含 prediction-immutability hook
-├── benchmark.md                       # 对标账号信息（cheat-learn-from 维护）
-├── audience.md                        # 受众画像（cheat-persona 派生；blind 硬禁读）
-├── scripts/                           # 拍前的所有草稿（cheat-seed 写或用户写）
+│   └── settings.json                  # includes the prediction-immutability hook
+├── benchmark.md                       # benchmark account info (maintained by cheat-learn-from)
+├── audience.md                        # audience persona (derived by cheat-persona; hard-blocked from blind reads)
+├── scripts/                           # all pre-shoot drafts (written by cheat-seed or the user)
 │   └── YYYY-MM-DD_<id>_<short>.md
-├── predictions/                       # immutable 预测日志（hook 保护）
-│   └── YYYY-MM-DD_<id>_<short>.md     # 与 scripts/ 同 id
-├── videos/                            # 拍后才建（cheat-shoot 创建）
+├── predictions/                       # immutable prediction log (hook-protected)
+│   └── YYYY-MM-DD_<id>_<short>.md     # same id as scripts/
+├── videos/                            # created only after shooting (by cheat-shoot)
 │   └── YYYY-MM-DD_<id>_<short>/
-│       ├── script.md                  # 用户提供的最终拍摄稿（cheat-shoot 时询问"和 scripts/ 一致吗"）
-│       └── report.md                  # T+3d 抓的数据 + 评论（cheat-retro 写）
-├── samples/                           # 对标账号视频 / 转录（cheat-learn-from 创建）
-│   └── <账号名>/<video-id>/{source.mp4 (可选), transcript.md, meta.md}
-├── candidates.md                      # 选题池（可选）
-└── content.db                         # 可选 SQLite，校准池规模化后启用
+│       ├── script.md                  # final shooting script supplied by the user (cheat-shoot asks "same as scripts/?")
+│       └── report.md                  # T+3d data + comments (written by cheat-retro)
+├── samples/                           # benchmark videos / transcripts (created by cheat-learn-from)
+│   └── <account-name>/<video-id>/{source.mp4 (optional), transcript.md, meta.md}
+├── candidates.md                      # candidate pool (optional)
+└── content.db                         # optional SQLite, enabled once the calibration pool scales
 ```
 
 ---
 
-## 文件清单
+## File inventory
 
-### 本 skill 包
+### This skill package
 
 ```
 cheat-on-content/
-├── SKILL.md                           # 本文件（总协议 + 路由）
-├── README.md                          # 营销门面
-├── skills/                            # 子 skill 集
-│   ├── cheat-init/SKILL.md            # ✅ 入口：onboarding 与脚手架
-│   ├── cheat-learn-from/SKILL.md      # ✅ 对标账号导入（拆 pattern + 派生 base rubric 信号）
-│   ├── cheat-seed/SKILL.md            # ✅ Cold-start 选题启动器（brainstorm + 可选 draft）
-│   ├── cheat-score/SKILL.md           # ✅ 单稿打分（不写文件）
-│   ├── cheat-predict/SKILL.md         # ✅ 盲预测 + immutable 日志
-│   ├── cheat-shoot/SKILL.md           # ✅ 登记拍摄（buffer +1）
-│   ├── cheat-publish/SKILL.md         # ✅ 发布元数据登记（buffer -1）
-│   ├── cheat-retro/SKILL.md           # ✅ 数据回收 + 复盘
-│   ├── cheat-persona/SKILL.md         # ✅ 受众画像派生（从复盘评论聚类）
-│   ├── cheat-bump/SKILL.md            # ✅ rubric 升级（含跨模型审）
-│   ├── cheat-recommend/SKILL.md       # ✅ 候选池排序推荐（按 buffer 颜色 + 1 稳 + 1 实验）
-│   ├── cheat-trends/SKILL.md          # ✅ 热点抓取（日常补充候选池，多 adapter）
-│   ├── cheat-status/SKILL.md          # ✅ 状态看板（含 buffer 警戒）
-│   ├── cheat-migrate/SKILL.md         # ✅ schema 升级（老用户 git pull 后用）
-│   └── cheat-score-blind/SKILL.md     # ✅ Channel B 隔离打分 sub-agent（仅 Task tool 调用）
-├── migrations/                        # schema 演进单一来源
-│   ├── registry.md                    # ✅ LATEST_SCHEMA + 版本链表
-│   └── <from>-to-<to>.md              # ✅ 每步迁移的 WHAT/WHY/HOW/Manual fallback
-├── shared-references/                 # 跨 skill 共享协议
-│   ├── blind-prediction-protocol.md   # ✅ 原则 #1
-│   ├── bump-validation-protocol.md    # ✅ 原则 #2
-│   ├── observation-lifecycle.md       # ✅ 原则 #3
-│   ├── prediction-anatomy.md          # ✅ 一份合格预测的 7 个组件
-│   ├── candidate-schema.md            # ✅ 候选项统一 schema
-│   ├── cadence-protocol.md            # ✅ 节奏协议（buffer 警戒 + 选题策略）
-│   ├── state-management.md            # ✅ .cheat-state.json 读写约定
-│   └── migration-protocol.md          # ✅ schema 演进哲学 + maintainer checklist
-├── starter-rubrics/                   # 各内容形态的先验 rubric
-│   ├── opinion-video.md               # ✅ 观点视频（中文，已校准 25+ 样本）
-│   ├── opinion-video-zero.md          # ✅ v0 等权占位（cold-start）
-│   ├── long-form-essay.md             # ⬜ 公众号 / Substack
-│   └── short-form-text.md             # ⬜ X thread / 微博长文
-├── templates/                         # skill 写进用户 repo 的文件骨架
-│   ├── gitignore.template             # ✅ 用户项目 .gitignore（护凭证，保留 predictions/ 入库）
+├── SKILL.md                           # this file (master protocol + routing)
+├── README.md                          # marketing front page
+├── skills/                            # sub-skill set
+│   ├── cheat-init/SKILL.md            # ✅ entry: onboarding and scaffolding
+│   ├── cheat-learn-from/SKILL.md      # ✅ benchmark account import (pattern extraction + base rubric signal)
+│   ├── cheat-seed/SKILL.md            # ✅ cold-start topic starter (brainstorm + optional draft)
+│   ├── cheat-score/SKILL.md           # ✅ single-draft scoring (writes no files)
+│   ├── cheat-predict/SKILL.md         # ✅ blind prediction + immutable log
+│   ├── cheat-shoot/SKILL.md           # ✅ register a shoot (buffer +1)
+│   ├── cheat-publish/SKILL.md         # ✅ register publish metadata (buffer -1)
+│   ├── cheat-retro/SKILL.md           # ✅ data collection + retrospective
+│   ├── cheat-persona/SKILL.md         # ✅ audience persona derivation (cluster retro comments)
+│   ├── cheat-bump/SKILL.md            # ✅ rubric bump (includes cross-model audit)
+│   ├── cheat-recommend/SKILL.md       # ✅ candidate-pool ranking (by buffer color + 1 steady + 1 experiment)
+│   ├── cheat-trends/SKILL.md          # ✅ trend fetch (daily candidate-pool top-up, multiple adapters)
+│   ├── cheat-status/SKILL.md          # ✅ status dashboard (includes buffer warning)
+│   ├── cheat-migrate/SKILL.md         # ✅ schema upgrade (for existing users after git pull)
+│   └── cheat-score-blind/SKILL.md     # ✅ Channel B isolated scoring sub-agent (Task tool only)
+├── migrations/                        # single source of truth for schema evolution
+│   ├── registry.md                    # ✅ LATEST_SCHEMA + version chain
+│   └── <from>-to-<to>.md              # ✅ WHAT/WHY/HOW/Manual fallback for each migration step
+├── shared-references/                 # cross-skill shared protocols
+│   ├── blind-prediction-protocol.md   # ✅ principle #1
+│   ├── bump-validation-protocol.md    # ✅ principle #2
+│   ├── observation-lifecycle.md       # ✅ principle #3
+│   ├── prediction-anatomy.md          # ✅ the 7 components of a valid prediction
+│   ├── candidate-schema.md            # ✅ unified candidate schema
+│   ├── cadence-protocol.md            # ✅ cadence protocol (buffer warnings + topic strategy)
+│   ├── state-management.md            # ✅ .cheat-state.json read/write conventions
+│   └── migration-protocol.md          # ✅ schema-evolution philosophy + maintainer checklist
+├── starter-rubrics/                   # prior rubrics for each content form
+│   ├── opinion-video.md               # ✅ opinion video (calibrated on 25+ samples)
+│   ├── opinion-video-zero.md          # ✅ v0 equal-weight placeholder (cold-start)
+│   ├── long-form-essay.md             # ⬜ WeChat Official Account / Substack
+│   └── short-form-text.md             # ⬜ X thread / Weibo long post
+├── templates/                         # file skeletons the skill writes into the user repo
+│   ├── gitignore.template             # ✅ user project's .gitignore (protects credentials, keeps predictions/ tracked)
 │   ├── rubric_notes.template.md       # ✅
-│   ├── prediction.template.md         # ✅ 统一版（所有阶段，含 confidence header）
+│   ├── prediction.template.md         # ✅ unified (all phases, includes confidence header)
 │   ├── retro.template.md              # ✅
 │   ├── candidates.template.md         # ✅
 │   ├── candidates.template.json       # ✅
-│   ├── script_patterns.template.md    # ✅ 写作 pattern 沉淀（含 benchmark 借鉴段说明）
-│   ├── benchmark.template.md          # ✅ 对标账号 reference
-│   ├── audience.template.md           # ✅ 受众画像骨架
+│   ├── script_patterns.template.md    # ✅ writing-pattern capture (includes benchmark-borrowing section)
+│   ├── benchmark.template.md          # ✅ benchmark account reference
+│   ├── audience.template.md           # ✅ audience persona skeleton
 │   ├── workflow.template.md           # ✅
 │   ├── status.template.md             # ✅
 │   └── content.db.schema.sql          # ✅
-├── hooks/                             # harness 强制层
-│   ├── prediction-immutability.json   # ✅ 阻塞型钩子（拦预测段编辑）
-│   ├── prediction-immutability.sh     # ✅ 拦截脚本
-│   ├── session-start.json             # ✅ SessionStart 自动报告 hook
-│   ├── session-start.sh               # ✅ 状态报告渲染脚本
-│   ├── meta-logging.json              # ✅ 被动记录配置
-│   └── log-event.sh                   # ✅ meta-logging 脚本
-├── tools/                             # 独立 CLI 脚本
-│   ├── score-curve.py                 # ⬜ 预测精度收敛曲线
-│   ├── md-to-sqlite.py                # ⬜ markdown → content.db 升级（批次 3）
-│   └── validate-bump.py               # ⬜ 校准池全量重打（批次 3）
-├── adapters/                          # 数据源适配
-│   ├── perf-data/                     # 复盘数据源（含 douyin-session）
-│   ├── candidate-pool/                # 候选池数据源
-│   ├── trend-sources/                 # 热点抓取源
-│   └── script-extraction/             # 视频/音频转 script（含 whisper for cheat-learn-from）
+├── hooks/                             # harness enforcement layer
+│   ├── prediction-immutability.json   # ✅ blocking hook (intercepts prediction-section edits)
+│   ├── prediction-immutability.sh     # ✅ interception script
+│   ├── session-start.json             # ✅ SessionStart auto-report hook
+│   ├── session-start.sh               # ✅ status-report renderer
+│   ├── meta-logging.json              # ✅ passive logging config
+│   └── log-event.sh                   # ✅ meta-logging script
+├── tools/                             # standalone CLI scripts
+│   ├── score-curve.py                 # ⬜ prediction-accuracy convergence curve
+│   ├── md-to-sqlite.py                # ⬜ markdown → content.db upgrade (batch 3)
+│   └── validate-bump.py               # ⬜ calibration-pool full re-score (batch 3)
+├── adapters/                          # data-source adapters
+│   ├── perf-data/                     # retrospective data sources (includes douyin-session)
+│   ├── candidate-pool/                # candidate-pool data sources
+│   ├── trend-sources/                 # trend-fetch sources
+│   └── script-extraction/             # video/audio → script (includes whisper for cheat-learn-from)
 └── examples/
-    ├── reference-implementation/      # 视频分析脱敏快照（待）
-    └── script_patterns.example.md     # script_patterns 全填示例（参考用，不复制）
+    ├── reference-implementation/      # anonymized video-analysis snapshot (pending)
+    └── script_patterns.example.md     # fully filled script_patterns example (reference only, do not copy)
 ```
 
-✅ = 当前批次（v1 骨架）已完成 / ⬜ = 后续批次
+✅ = completed in the current batch (v1 skeleton) / ⬜ = future batch
 
 ---
 
 ## Tone & voice
 
-写面向用户的文案（commit message / 复盘小结等）时，匹配项目的 **直白克制（reflective-irreverent）** voice：
+When writing user-facing copy (commit messages / retro summaries, etc.), match the project's **reflective-irreverent** voice:
 
-- 直接说出失败：「composite 8.47 但实际只有 16.8w——rubric 高估了 SR」
-- **不要**用模糊措辞软化：「这或许可能在某种程度上暗示...」——别这么写
-- Cluely 风格的反叛 hook 只在 README 出现——**不要写进** `rubric_notes.md` 或预测日志
+- Name failure directly: "composite 8.47 but actual was only 168k — the rubric overestimated SR"
+- **Do not** soften with vague language: "this may perhaps in some sense suggest..." — don't write like that
+- Cluely-style rebellious hooks belong only in the README — **do not write them into** `rubric_notes.md` or prediction logs
 
 ---
 
-## 给开发者：扩展本 skill
+## For developers: extending this skill
 
-- 新增内容形态 → 加 `starter-rubrics/<form>.md`
-- 新增热点抓取源 → 加 `adapters/trend-sources/<name>.md`，符合 [candidate-schema.md](shared-references/candidate-schema.md) 输出契约
-- 修改原则 → 改 `shared-references/<protocol>.md`，所有引用它的 skill 自动跟进
-- 修改路由 → 改本文件的"路由表"段
-- 子 skill 内部细节 → 直接改对应 `skills/cheat-*/SKILL.md`
+- New content form → add `starter-rubrics/<form>.md`
+- New trend source → add `adapters/trend-sources/<name>.md`, conforming to the output contract in [candidate-schema.md](shared-references/candidate-schema.md)
+- Change a principle → edit `shared-references/<protocol>.md`; every skill that references it follows automatically
+- Change routing → edit this file's "Routing table" section
+- Sub-skill internals → edit the corresponding `skills/cheat-*/SKILL.md`
 
-完整开发指南见 README.md。
+See README.md for the full development guide.

@@ -17,7 +17,7 @@ class PrivacyBoundaryTests(unittest.TestCase):
     def test_report_excludes_raw_and_comment_identity_fields(self) -> None:
         post = {
             "post_id": "own-post-123",
-            "title": "自己的作品",
+            "title": "My own post",
             "view_count": 10,
             "raw": {"signed_url": "https://media.example/video?signature=secret"},
         }
@@ -25,14 +25,14 @@ class PrivacyBoundaryTests(unittest.TestCase):
             {
                 "comment_id": "internal-comment-id",
                 "nickname": "internal-user-name",
-                "text": "有帮助",
+                "text": "Helpful",
                 "like_count": 2,
             }
         ]
 
-        report = renderer.render_report(post, "稿子", comments)
+        report = renderer.render_report(post, "Script", comments)
 
-        self.assertIn("有帮助", report)
+        self.assertIn("Helpful", report)
         self.assertNotIn("internal-comment-id", report)
         self.assertNotIn("internal-user-name", report)
         self.assertNotIn("signature=secret", report)

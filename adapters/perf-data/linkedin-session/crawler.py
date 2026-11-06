@@ -1,9 +1,9 @@
-"""LinkedIn 单帖分析抓取。
+"""LinkedIn single-post analytics crawler.
 
-登录一次后，Cookie（含 `li_at`）持久化在 .auth-linkedin/，之后直接复用。
-LinkedIn 把单帖分析（/analytics/post-summary/）SSR/inline 进页面，没有稳定可拦的
-voyager XHR，所以读渲染后 DOM 文本、按已知标签锚点解析（见 extract.py）。
-和 douyin-session 一样：一次抓取共享一个持久化 Chromium 会话。
+After logging in once, the cookie (including `li_at`) is persisted in .auth-linkedin/ and reused directly.
+LinkedIn SSRs/inlines single-post analytics (/analytics/post-summary/) into the page, with no stable
+voyager XHR to intercept, so we read the rendered DOM text and parse by known label anchors (see extract.py).
+Like douyin-session: one crawl shares a single persistent Chromium session.
 """
 from __future__ import annotations
 
@@ -23,13 +23,13 @@ _ACTIVITY_RE = re.compile(r"urn:li:activity:(\d+)|activity[:-](\d+)|/(\d{15,25})
 
 
 def extract_activity_id(raw: str) -> str:
-    """从帖子 URL 或裸 id 提取 activity_id。
+    """Extract activity_id from a post URL or a bare id.
 
-    支持：
-    - 裸 id：`7470493738918920193`
-    - 帖子链接：`https://www.linkedin.com/feed/update/urn:li:activity:7470493738918920193/`
-    - 分析链接：`https://www.linkedin.com/analytics/post-summary/urn:li:activity:7470493738918920193/`
-    抽不出时原样返回（交给上层报错）。
+    Supports:
+    - bare id: `7470493738918920193`
+    - post link: `https://www.linkedin.com/feed/update/urn:li:activity:7470493738918920193/`
+    - analytics link: `https://www.linkedin.com/analytics/post-summary/urn:li:activity:7470493738918920193/`
+    Returns the input unchanged when extraction fails (the caller reports the error).
     """
     raw = raw.strip()
     if raw.isdigit():
@@ -41,7 +41,7 @@ def extract_activity_id(raw: str) -> str:
 
 
 class Session:
-    """单浏览器会话，持久化登录态。"""
+    """Single browser session with a persistent login."""
 
     def __init__(self, ctx: BrowserContext, pw: Any) -> None:
         self.ctx = ctx
@@ -73,19 +73,19 @@ async def _logged_in(ctx: BrowserContext) -> bool:
 
 
 async def ensure_login(timeout_s: int = 300) -> bool:
-    """打开 LinkedIn，等用户登录；检测到 li_at cookie 后返回。"""
+    """Open LinkedIn and wait for the user to log in; returns once the li_at cookie is detected."""
     sess = await Session.open()
     try:
         page = await sess.ctx.new_page()
         await page.goto(FEED)
-        print(f"[登录] 在弹出的 Chromium 里登录 LinkedIn。最多等 {timeout_s} 秒……")
+        print(f"[login] Log in to LinkedIn in the Chromium window. Waiting up to {timeout_s} seconds...")
         for i in range(timeout_s):
             if await _logged_in(sess.ctx):
-                print(f"[登录] ✓ 检测到 li_at（用时 {i}s）。Cookie 已存到 .auth-linkedin/")
+                print(f"[login] OK: li_at detected ({i}s). Cookie stored in .auth-linkedin/")
                 await asyncio.sleep(1)
                 return True
             await asyncio.sleep(1)
-        print("[登录] 超时未检测到登录态。")
+        print("[login] Timed out without detecting a login.")
         return False
     finally:
         await sess.close()
@@ -99,7 +99,7 @@ async def _scrape_post(page: Page, activity_id: str) -> dict:
     )
     await asyncio.sleep(7)
     if "post-summary" not in page.url:
-        print(f"[post] ⚠ 可能被登出 / 重定向：{page.url}")
+        print(f"[post] WARNING: possibly logged out / redirected: {page.url}")
     txt = await page.inner_text("body")
     dbg = debug_dir()
     dbg.mkdir(parents=True, exist_ok=True)
@@ -109,16 +109,16 @@ async def _scrape_post(page: Page, activity_id: str) -> dict:
     result["meta"] = parse_post_meta(txt)
     result["activity_id"] = activity_id
     if result["metrics"].get("impressions") is None:
-        print(f"[post] ⚠ {activity_id} 没抽到 impressions（结构可能变了，看 {dbg}/post_{activity_id}.txt）")
+        print(f"[post] WARNING: no impressions extracted for {activity_id} (layout may have changed; see {dbg}/post_{activity_id}.txt)")
     return result
 
 
 async def fetch_post_summary(activity_id: str, headless: bool = True) -> dict:
-    """DOM 抽取单帖分析（/analytics/post-summary/）。只能看**你自己**的帖子。"""
+    """Extract single-post analytics from the DOM (/analytics/post-summary/). Only **your own** posts are visible."""
     sess = await Session.open(headless=headless)
     try:
         if not await _logged_in(sess.ctx):
-            print("[post] 未登录。先跑：python review.py login")
+            print("[post] Not logged in. Run first: python review.py login")
             return {}
         page = await sess.ctx.new_page()
         return await _scrape_post(page, activity_id)
@@ -127,8 +127,8 @@ async def fetch_post_summary(activity_id: str, headless: bool = True) -> dict:
 
 
 async def fetch_all(activity_id: str, headless: bool = True) -> dict:
-    """抓单帖分析，返回 {'post': {...}}（与 review.py 的渲染入口对齐）。"""
-    print(f"  → 打开单帖分析页 activity:{activity_id}")
+    """Fetch single-post analytics and return {'post': {...}} (aligned with review.py's render entry point)."""
+    print(f"  -> Opening the single-post analytics page activity:{activity_id}")
     post = await fetch_post_summary(activity_id, headless=headless)
     if post:
         m = post.get("metrics", {})

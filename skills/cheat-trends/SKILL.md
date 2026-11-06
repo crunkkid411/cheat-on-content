@@ -1,163 +1,163 @@
 ---
 name: cheat-trends
-description: 从配置的热点源（HN / Reddit / YouTube trending / B 站热门 / 等）抓今天的热门话题，去重 + 粗打分 + 写入 candidates.md。**绝大部分人没有候选池——这是让"我没素材"问题在 onboarding 第二步就消失的钥匙**。触发词："抓热点"/"fetch trends"/"今天有什么可做的"/"trending now"/"找选题"。
+description: Fetch today's trending topics from the configured trend sources (HN / Reddit / YouTube trending / Bilibili trending / etc.), dedupe + rough-score + write into candidates.md. **Most people have no candidate pool — this is the key that makes the "I have no material" problem disappear at onboarding step two**. Triggers: "抓热点" / "fetch trends" / "今天有什么可做的" / "trending now" / "找选题".
 argument-hint: "[— sources: <comma-separated>] [— max-per: 20]"
 allowed-tools: Bash(*), Read, Write, Edit, Glob, WebFetch, Skill
 ---
 
-# /cheat-trends — 热点抓取
+# /cheat-trends — trend fetching
 
-多 adapter 模式：读各 `trend-sources` adapter 的输出 → 去重 → 粗打分 → 写入 `candidates.md`。
+Multi-adapter mode: read each `trend-sources` adapter's output → dedupe → rough-score → write into `candidates.md`.
 
 ## Overview
 
 ```
-[用户：抓热点]
+[User: fetch trends]
   ↓
-[Phase 0: 读 .cheat-state.json 拿 enabled adapters]
+[Phase 0: read .cheat-state.json for enabled adapters]
   ↓
-[Phase 1: 对每个 adapter 调 fetch]
+[Phase 1: call fetch on each adapter]
   ↓
-[Phase 2: normalize 到 candidate-schema]
+[Phase 2: normalize to candidate-schema]
   ↓
-[Phase 3: 去重（vs candidates / predictions / trends-history）]
+[Phase 3: dedupe (vs candidates / predictions / trends-history)]
   ↓
-[Phase 4: 对每个新 item 粗打分（调 cheat-score 内联逻辑）]
+[Phase 4: rough-score each new item (reusing cheat-score's inline logic)]
   ↓
-[Phase 5: 排序 + 询问用户哪些加入 candidates.md]
+[Phase 5: sort + ask the user which ones to add to candidates.md]
   ↓
-[Phase 6: 写入 + 更新 trends-history.jsonl 缓存]
+[Phase 6: write + update the trends-history.jsonl cache]
 ```
 
 ## Constants
 
-- **TREND_SOURCES = ["manual-paste"]** — 启用的 adapter 列表（默认仅 manual-paste，最稳）
-- **LOOKBACK_HOURS = 24** — 抓最近 N 小时的热点
-- **MAX_PER_SOURCE = 20** — 每个 adapter 最多 N 条
-- **DEDUPE = true** — 去重开关
-- **AUTO_SCORE = true** — 抓回来后自动调 cheat-score 粗打分
-- **MIN_COMPOSITE_TO_SUGGEST = 6.0** — 低于此分的不推荐用户加入候选池（仍写入 trends-history 避免下次重复推）
+- **TREND_SOURCES = ["manual-paste"]** — enabled adapter list (default is manual-paste only, the most stable)
+- **LOOKBACK_HOURS = 24** — fetch trends from the last N hours
+- **MAX_PER_SOURCE = 20** — at most N items per adapter
+- **DEDUPE = true** — dedupe switch
+- **AUTO_SCORE = true** — automatically rough-score after fetching
+- **MIN_COMPOSITE_TO_SUGGEST = 6.0** — items below this score are not recommended for the pool (still written to trends-history so they are not recommended again)
 
-> 💡 调用时覆盖：`/cheat-trends — sources: manual-paste,aihot,weibo-hot — max-per: 10`
+> 💡 Override at call time: `/cheat-trends — sources: manual-paste,aihot,weibo-hot — max-per: 10`
 
 ## Inputs
 
-| 必填 | 来源 |
+| Required | Source |
 |---|---|
-| `.cheat-state.json` | 默认 sources |
-| `adapters/trend-sources/<name>.md` | 各 adapter 的实现描述 |
-| `candidates.md` | 去重对照 |
-| `predictions/*.md` | 去重对照（已发的不再推） |
-| `.cheat-cache/trends-history.jsonl` | 历史抓取去重缓存 |
+| `.cheat-state.json` | default sources |
+| `adapters/trend-sources/<name>.md` | each adapter's implementation description |
+| `candidates.md` | dedupe reference |
+| `predictions/*.md` | dedupe reference (do not re-recommend published items) |
+| `.cheat-cache/trends-history.jsonl` | historical fetch dedupe cache |
 
 ## Workflow
 
-### Phase 0: 读启用的 adapters
+### Phase 0: Read enabled adapters
 
 ```python
-# 伪代码
+# pseudocode
 state = read('.cheat-state.json')
 enabled_adapters = args.sources or state.get('enabled_trend_sources', ['manual-paste'])
 ```
 
-如 enabled_adapters 为空 → 输出引导：
+If enabled_adapters is empty → output guidance:
 
 ```
-你目前没有启用任何热点源。
+You currently have no trend sources enabled.
 
-最快配法：
-- 临时跑：/cheat-trends — sources: manual-paste,aihot
-- 永久启用：编辑 .cheat-state.json 的 enabled_trend_sources 数组
+Fastest setup:
+- One-off run: /cheat-trends — sources: manual-paste,aihot
+- Permanently enable: edit the enabled_trend_sources array in .cheat-state.json
 
-可用 adapter（详见 adapters/trend-sources/）：
-- manual-paste（默认，永远能用）
-- aihot（AI 热点聚合，无需 key）
-- weibo-hot（微博热搜，无需 key）
-- zhihu-hot（知乎热榜，无需 key）
-- trendradar-mcp（TrendRadar MCP 服务，需配置）
+Available adapters (see adapters/trend-sources/):
+- manual-paste (default, always works)
+- aihot (AI trend aggregator, no key needed)
+- weibo-hot (Weibo hot search, no key needed)
+- zhihu-hot (Zhihu hot list, no key needed)
+- trendradar-mcp (TrendRadar MCP service, requires configuration)
 ```
 
-### Phase 1-2: 对每个 adapter 调 fetch + normalize
+### Phase 1-2: Call fetch + normalize for each adapter
 
-对每个 adapter，读其 `adapters/trend-sources/<name>.md` 中描述的 fetch 接口（实际是 Bash 调底层 Python / shell / WebFetch）：
+For each adapter, read the fetch interface described in its `adapters/trend-sources/<name>.md` (in practice a Bash call to underlying Python / shell / WebFetch):
 
-| Adapter | 实现机制 |
+| Adapter | Implementation |
 |---|---|
-| `manual-paste` | 询问用户："粘贴你今天的候选 URL/标题列表（每行一条）" → 解析每行，对 URL 做 WebFetch 拓展 snippet |
-| `aihot` | 读 adapters/trend-sources/aihot.md 描述的 fetch 接口 |
-| `weibo-hot` | 读 adapters/trend-sources/weibo-hot.md 描述的 fetch 接口 |
-| `zhihu-hot` | 读 adapters/trend-sources/zhihu-hot.md 描述的 fetch 接口 |
-| `trendradar-mcp` | 读 adapters/trend-sources/trendradar-mcp.md 描述的 fetch 接口 |
+| `manual-paste` | Ask the user: "Paste your candidate URL/title list for today (one per line)" → parse each line, WebFetch URLs to expand a snippet |
+| `aihot` | Read the fetch interface described in adapters/trend-sources/aihot.md |
+| `weibo-hot` | Read the fetch interface described in adapters/trend-sources/weibo-hot.md |
+| `zhihu-hot` | Read the fetch interface described in adapters/trend-sources/zhihu-hot.md |
+| `trendradar-mcp` | Read the fetch interface described in adapters/trend-sources/trendradar-mcp.md |
 
-每个 adapter 输出符合 [candidate-schema.md](../../shared-references/candidate-schema.md) 的 items。
+Each adapter outputs items conforming to [candidate-schema.md](../../shared-references/candidate-schema.md).
 
-**优雅降级**：单 adapter 失败（API key 缺失 / 端点 503 / cookie 失效）→ skip 该 adapter，**不抛异常**，在汇总里说明：
+**Graceful degradation**: a single adapter fails (missing API key / endpoint 503 / expired cookie) → skip that adapter, **do not throw**, and explain in the summary:
 ```
-✅ aihot: 拉到 18 条
-✅ weibo-hot: 拉到 15 条
-✅ zhihu-hot: 拉到 12 条
-⚠️  trendradar-mcp: 跳过（MCP 服务未配置——配置见 adapters/trend-sources/trendradar-mcp.md）
+✅ aihot: fetched 18
+✅ weibo-hot: fetched 15
+✅ zhihu-hot: fetched 12
+⚠️  trendradar-mcp: skipped (MCP service not configured — see adapters/trend-sources/trendradar-mcp.md)
 ```
 
-### Phase 3: 去重
+### Phase 3: Dedupe
 
-按 [candidate-schema.md](../../shared-references/candidate-schema.md) 的"去重协议"：
+Per the "dedupe protocol" in [candidate-schema.md](../../shared-references/candidate-schema.md):
 
-1. 对每个 item 算 id（`sha256(source_type + normalized_title + url_path)[:12]`）
-2. 检查 `candidates.md` 已含此 id → 跳过
-3. 检查 `predictions/*.md` 已含此 id → 跳过
-4. 检查 `.cheat-cache/trends-history.jsonl` 已含此 id 且 `rejected_at != null` → 跳过
+1. Compute each item's id (`sha256(source_type + normalized_title + url_path)[:12]`)
+2. Check whether `candidates.md` already contains this id → skip
+3. Check whether `predictions/*.md` already contains this id → skip
+4. Check whether `.cheat-cache/trends-history.jsonl` already contains this id with `rejected_at != null` → skip
 
-去重统计写到汇总报告里。
+Write dedupe statistics into the summary report.
 
-### Phase 4: 粗打分
+### Phase 4: Rough scoring
 
-`AUTO_SCORE=true` 时，对每条新 item：
-1. 用 item 的 `snapshot_text` 作为输入
-2. 按当前 rubric 给 7 维打分（**不**调 `/cheat-score` 子 skill 走 IO；inline 复用打分逻辑）
-3. 算 composite
-4. 给一句 rationale
+When `AUTO_SCORE=true`, for each new item:
+1. Use the item's `snapshot_text` as input
+2. Score the 7 dimensions per the current rubric (**do not** call the `/cheat-score` sub-skill with its IO; reuse the scoring logic inline)
+3. Compute the composite
+4. Give a one-sentence rationale
 
-**注意**：粗打分 ≠ 正式预测。预测必须基于最终稿（用户改过的），这里的打分只是"是否值得展开写"的粗筛。
+**Note**: rough scoring ≠ a formal prediction. A prediction must be based on the final draft (after the user's rewrite); scoring here is only a rough filter for "is this worth expanding into a draft".
 
-`AUTO_SCORE=false` 时，items 写入 candidates.md 时 composite=null，需要后续手动 `/cheat-score`。
+When `AUTO_SCORE=false`, items are written into candidates.md with composite=null and need a manual `/cheat-score` later.
 
-### Phase 5: 排序 + 询问
+### Phase 5: Sort + ask
 
-按 composite 降序，过滤掉 composite < `MIN_COMPOSITE_TO_SUGGEST` 的：
+Sort by composite descending, filtering out composite < `MIN_COMPOSITE_TO_SUGGEST`:
 
 ```
-🔥 抓热点完成。各源拉取统计：
-- manual-paste: 5 条（用户输入）
-- aihot: 18 条
-- weibo-hot: 15 条
-跳过 trendradar-mcp（MCP 服务未配置）
+🔥 Trend fetch complete. Per-source statistics:
+- manual-paste: 5 (user input)
+- aihot: 18
+- weibo-hot: 15
+Skipped trendradar-mcp (MCP service not configured)
 
-去重后剩 27 条新 item。
-粗打分后 12 条 composite ≥ 6.0：
+After dedupe, 27 new items remain.
+After rough scoring, 12 have composite ≥ 6.0:
 
-| # | 标题 | source | composite | bucket | rationale |
+| # | Title | source | composite | bucket | rationale |
 |---|---|---|---|---|---|
-| 1 | 为什么我们都讨厌主动联系朋友 | aihot | 8.4 | 30-100w | ER+QL 双 5，AB 普适 |
-| 2 | "她不一样"的一千种变体 | weibo-hot | 8.1 | 30-100w | MS 候选维度高 |
+| 1 | Why we all hate reaching out to friends first | aihot | 8.4 | 30-100w | ER+QL both 5, AB universal |
+| 2 | The thousand variants of "she's different" | weibo-hot | 8.1 | 30-100w | MS candidate dimension high |
 | 3 | ...... |
 
-哪些加入 candidates.md？
-- 全部加 → 回 "all"
-- 选几个 → 回 "1, 3, 5"
-- 都不要 → 回 "none"（这些会被记到 trends-history 避免下次重复推）
+Which ones to add to candidates.md?
+- All → reply "all"
+- A few → reply "1, 3, 5"
+- None → reply "none" (they are recorded in trends-history so they are not recommended again)
 ```
 
-### Phase 6: 落盘
+### Phase 6: Persist
 
-用户响应后：
-1. 选中的 items → 按 [candidate-schema.md](../../shared-references/candidate-schema.md) 的"Markdown 表示"格式追加到 `candidates.md`
-2. 所有抓回来的 items（不管选中与否）→ append 到 `.cheat-cache/trends-history.jsonl`：
+After the user responds:
+1. Selected items → append to `candidates.md` in the "Markdown representation" format from [candidate-schema.md](../../shared-references/candidate-schema.md)
+2. All fetched items (selected or not) → append to `.cheat-cache/trends-history.jsonl`:
    ```jsonl
    {"id": "...", "title": "...", "source": "...", "snapshot_at": "...", "rejected_at": null|"<ISO>", "fetched_at": "<ISO>"}
    ```
 
-### Phase 7: 状态更新
+### Phase 7: State update
 
 ```json
 {
@@ -168,32 +168,32 @@ enabled_adapters = args.sources or state.get('enabled_trend_sources', ['manual-p
 
 ## Key Rules
 
-1. **不抛异常**。单 adapter 失败 → skip + 报告。多 adapter 全失败 → 报错"所有源都失败"，附排查指引
-2. **manual-paste 永远在**。即使其他所有 adapter 都坏了，manual-paste 模式必须能跑——它是兜底
-3. **去重是硬约束**。同 id 不重复推；用户拒绝过的 6 个月内不再推
-4. **粗打分要诚实标注**。在 candidates.md 的 entry 里标 `composite (rough, snapshot-based)`，避免与 prediction 的精打分混淆
-5. **不直接进 predictions/**。trends 只产 candidates，predict 是另一个动作
+1. **Do not throw**. A single adapter failure → skip + report. All adapters failing → error "all sources failed" with troubleshooting guidance
+2. **manual-paste is always available**. Even if every other adapter is broken, manual-paste must work — it is the fallback
+3. **Dedupe is a hard constraint**. Do not re-recommend the same id; do not re-recommend items the user rejected for 6 months
+4. **Rough scores must be labeled honestly**. Mark entries in candidates.md as `composite (rough, snapshot-based)` to avoid confusion with precise prediction scores
+5. **Do not go straight into predictions/**. trends only produces candidates; predict is a separate action
 
 ## Refusals
 
-- 「直接抓抖音热门 feed，不用 cookie」 → 拒绝。抖音反爬极严，无 cookie 必失败；引导到 douyin-session adapter 配置文档
-- 「跳过去重，把所有抓到的都写进去」 → 拒绝。会污染候选池，下次 recommend 时排序失效
-- 「跳过粗打分，直接写 raw 标题」 → 允许（`AUTO_SCORE=false`），但提示用户后续需要 `/cheat-score` 才能进 recommend 池
+- "Just scrape the Douyin trending feed without a cookie" → refuse. Douyin's anti-scraping is extremely strict; without a cookie it will fail. Point to the douyin-session adapter setup docs
+- "Skip dedupe and write everything you fetched" → refuse. It pollutes the candidate pool and breaks ranking at the next recommend
+- "Skip rough scoring and write raw titles" → allowed (`AUTO_SCORE=false`), but tell the user that `/cheat-score` is needed later before they can enter the recommend pool
 
 ## Integration
 
-- 上游：用户配置 `.cheat-state.json` 的 `enabled_trend_sources` 数组
-- 下游：`/cheat-recommend` 直接读 `candidates.md` 排序——trends 写完，recommend 立刻看到
-- 与 `/cheat-init`：onboarding Q4 选"没有候选池"的用户被引导到这里
-- 与 `/cheat-status`：status 看板显示"上次抓热点：X 天前 / 待清理候选池：Y 条"
+- Upstream: the user configures the `enabled_trend_sources` array in `.cheat-state.json`
+- Downstream: `/cheat-recommend` reads `candidates.md` directly for ranking — once trends writes, recommend sees it immediately
+- With `/cheat-init`: users who choose "no candidate pool" at onboarding Q4 are guided here
+- With `/cheat-status`: the status dashboard shows "last trend fetch: X days ago / candidate pool awaiting cleanup: Y entries"
 
-## Adapter 实现注意事项
+## Adapter implementation notes
 
-每个 `adapters/trend-sources/<name>.md` 必须文档化以下：
-1. **依赖**：API key / cookie / package
-2. **fetch 接口**：调用方式（python script path / shell command / API endpoint）
-3. **输出 schema**：必须符合 candidate-schema.md
-4. **失败模式**：常见错误 + 优雅降级行为
-5. **稳定性等级**：★ 1-5 颗星
+Each `adapters/trend-sources/<name>.md` must document the following:
+1. **Dependencies**: API key / cookie / package
+2. **Fetch interface**: how to call it (python script path / shell command / API endpoint)
+3. **Output schema**: must conform to candidate-schema.md
+4. **Failure modes**: common errors + graceful-degradation behavior
+5. **Stability level**: ★ 1-5 stars
 
-详见 [adapters/HOWTO.md](../../adapters/HOWTO.md)（待批次 3 实现）。
+See [adapters/HOWTO.md](../../adapters/HOWTO.md) (to be implemented in batch 3).

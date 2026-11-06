@@ -1,432 +1,432 @@
 ---
 name: cheat-seed
-description: 跟用户对话讨论选题——**默认一次一个**，用户主动给主题或经历，AI 围绕用户的输入深挖、提炼角度、写一份 draft。不是 AI 拿三个开放问题追用户，也不是一次给 5 个候选。触发词："找选题"/"我想做一条 X"/"最近有个想法"/"seed"/"启动种子"。可选 batch 模式：`/cheat-seed --batch 5` 走旧的 brainstorm 5 候选 + 写 5 draft 流程。
+description: Talk through content topics with the user — **one at a time by default**; the user offers a subject or an experience, and the AI digs into their input, distills an angle, and writes a draft. This is not the AI chasing the user with three open questions, nor dumping 5 candidates at once. Triggers: "找选题" / "我想做一条 X" / "最近有个想法" / "seed" / "启动种子". Optional batch mode: `/cheat-seed --batch 5` runs the old brainstorm-5-candidates + write-5-drafts flow.
 argument-hint: "[— batch: N] [— sources: <comma-separated>]"
 allowed-tools: Bash(*), Read, Write, Edit, Glob, WebFetch, Skill
 ---
 
-# /cheat-seed — 选题对话（默认）/ 批量 brainstorm（可选）
+# /cheat-seed — topic conversation (default) / batch brainstorm (optional)
 
-cheat-seed 的核心是**跟用户讨论选题**，不是机械地 brainstorm。好内容来自用户的真实经历 + 观察 + 情绪——这些是 AI 不可能凭空 brainstorm 出来的。AI 的角色是**听用户讲 → 帮提炼角度 → 写一份 draft**，不是 dump 15 候选让用户挑。
+The core of cheat-seed is **discussing topics with the user**, not mechanically brainstorming. Good content comes from the user's real experience + observations + emotions — none of which an AI can brainstorm out of thin air. The AI's role is to **listen → help distill an angle → write one draft**, not dump 15 candidates for the user to pick from.
 
-**默认模式**：对话式一次一个。
-**Batch 模式**（`--batch N`）：保留旧的 brainstorm N 候选 + 写 N 份 draft 流程，给"完全没想法 + 想批量初始化"的用户。
+**Default mode**: conversational, one at a time.
+**Batch mode** (`--batch N`): keeps the old brainstorm-N-candidates + write-N-drafts flow, for users who "have no ideas at all + want to initialize in bulk".
 
-## 三种 Mode（自动识别）
+## Three modes (auto-detected)
 
 ```
-Mode A — 用户主动给主题（**最常见**）：
-  用户："/cheat-seed" + 直接说"我想做一条关于 X 的"
-       或："/cheat-seed 我最近开会被领导..."
+Mode A — the user proactively gives a subject (**most common**):
+  User: "/cheat-seed" + directly says "I want to make one about X"
+       or: "/cheat-seed at the meeting recently my boss..."
   ↓
-  AI 围绕 X / 这件事**深挖**——什么瞬间触发？最让你 [情绪 / 不爽 / 觉得有意思] 的是哪点？
+  AI **digs into** X / that event — which moment triggered it? What part made you most [emotional / annoyed / intrigued]?
   ↓
-  收敛到一个具体角度 → 提议 → 用户认可 → 写 1 份 draft → 完成
+  Converge on one concrete angle → propose → user approves → write 1 draft → done
   ↓
-  问"下一篇？" 或用户说"今天就这样"
+  Ask "next one?" or the user says "that's it for today"
 
-Mode B — 用户给方向但不具体：
-  用户："最近想做点关于 [职场 / 婚恋 / AI / ...] 的"
+Mode B — the user gives a direction but not anything specific:
+  User: "I've been wanting to do something about [workplace / relationships / AI / ...]"
   ↓
-  AI："[范围] 太广。最近你接触到的具体哪件事让你想做这个方向？"
+  AI: "[Scope] is too broad. What specific thing you encountered recently makes you want to do this direction?"
   ↓
-  收敛到 Mode A 的具体经历
+  Converge into a concrete experience → Mode A
 
-Mode C — 用户完全没想法（少见）：
-  用户："我不知道做什么" / "帮我想个题"
+Mode C — the user has no idea at all (rare):
+  User: "I don't know what to make" / "help me think of a topic"
   ↓
-  AI："好，进 brainstorm 模式——先抓热点 + 你之前的兴趣方向，给你 1 个建议"
+  AI: "OK, entering brainstorm mode — first grab trends + your previous interest areas, then give you 1 suggestion"
   ↓
-  跑 trend-sources 抓热点 + 读 candidates.md / predictions/ 看用户历史
+  Run trend-sources to grab trends + read candidates.md / predictions/ to see the user's history
   ↓
-  提议 1 个角度（不是 5 个） → 用户认可 → 写 draft
+  Propose 1 angle (not 5) → user approves → write draft
 
-Batch Mode — 用户显式要批量（`/cheat-seed --batch 5`）：
-  按旧版 brainstorm 流程：3 问题 → 15 候选 → 用户挑 → 写 5 draft。
-  给"今天想一次性把未来 2 周的选题搞定"的用户。
+Batch Mode — the user explicitly asks for bulk (`/cheat-seed --batch 5`):
+  Follows the old brainstorm flow: 3 questions → 15 candidates → user picks → write 5 drafts.
+  For users who "want to settle the next 2 weeks of topics in one go today".
 ```
 
-**关键纠正**（与旧版的区别）：
-- AI **不主动开放问**——等用户给输入再深挖
-- 一次一个选题，不是 5 个
-- 默认对话式 + 一次一个，batch 是 escape hatch
+**Key corrections** (vs the old version):
+- The AI **does not open with questions** — it waits for user input, then digs deeper
+- One topic at a time, not 5
+- Default is conversational + one at a time; batch is an escape hatch
 
 ## Constants
 
-- **DEFAULT_TREND_SOURCES = ["manual-paste"]** — 仅 Mode C / Mode A 灰色场景 / Batch 用到。用户可在 state 里加 aihot / trendradar-mcp
-- **TREND_TOOL_ROUTING** — 按 `content_form` 路由数据源，详见 [shared-references/data-source-routing.md](../../shared-references/data-source-routing.md)
-- **MODE_B_MAX_REPROBE_TURNS = 2** — Mode B "为什么" 反问最多 2 轮；超过则转 Mode C
-- **MAX_DEEP_DIVE_TURNS = 4** — Mode A 收敛阶段最多 4 轮反问，避免 AI 过度盘问
-- **WITH_DRAFT = yes** — 默认确认角度后立刻写 draft；用户可说 "等下，我自己写" 跳过
-- **DRAFT_LENGTH** — 派生自 `state.typical_duration_seconds`：30s→100-200字 / 90s→250-500字 / 240s→600-1000字 / 450s→1100-2000字 / 900s→2200+字
-- **HUMANIZE_DRAFT = on**（默认）/ off —— 写完 draft 后用 `humanizer` skill 过一遍，去掉 AI 写作 tells（em-dash 滥用 / rule of three / inflated 词汇 / 空泛归因等）。off 时直接出原始 AI draft。**只 humanize 正文，不动 header 的"必须改写"警告**
+- **DEFAULT_TREND_SOURCES = ["manual-paste"]** — only used in Mode C / gray-area Mode A / Batch. Users can add aihot / trendradar-mcp in state
+- **TREND_TOOL_ROUTING** — routes data sources by `content_form`; see [shared-references/data-source-routing.md](../../shared-references/data-source-routing.md)
+- **MODE_B_MAX_REPROBE_TURNS = 2** — Mode B's "why" follow-up is capped at 2 rounds; beyond that, switch to Mode C
+- **MAX_DEEP_DIVE_TURNS = 4** — Mode A's convergence stage is capped at 4 follow-up rounds, to avoid over-interrogating the user
+- **WITH_DRAFT = yes** — by default, write the draft immediately after the angle is confirmed; the user can say "wait, I'll write it myself" to skip
+- **DRAFT_LENGTH** — derived from `state.typical_duration_seconds`: 30s→100-200 words / 90s→250-500 / 240s→600-1000 / 450s→1100-2000 / 900s→2200+
+- **HUMANIZE_DRAFT = on** (default) / off — after the draft is written, run it through the `humanizer` skill to remove AI writing tells (em-dash overuse / rule of three / inflated vocabulary / vague attributions etc.). When off, output the raw AI draft. **Only humanize the body; do not touch the header's "must rewrite" warning**
 
 ## Inputs
 
-| 必填 | 来源 |
+| Required | Source |
 |---|---|
-| `.cheat-state.json` | 读 calibration_samples / typical_duration / cadence |
-| `rubric_notes.md` | 读当前 rubric（粗打分用） |
-| `script_patterns.md` | 读已有 pattern（写 draft 时按 cheat sheet 选结构） |
-| `predictions/*.md`（如有） | 已发历史，brainstorm 时作为 context |
-| `audience.md`（如有） | 受众画像——选题 / 写稿时的"谁在看"镜子（由 `/cheat-persona` 派生） |
+| `.cheat-state.json` | read calibration_samples / typical_duration / cadence |
+| `rubric_notes.md` | read the current rubric (for rough scoring) |
+| `script_patterns.md` | read existing patterns (pick a structure from the cheat sheet when writing a draft) |
+| `predictions/*.md` (if any) | published history, used as context during brainstorming |
+| `audience.md` (if any) | audience persona — the "who is watching" mirror when choosing topics / writing drafts (derived by `/cheat-persona`) |
 
 ## Workflow
 
-### Phase 0: 前置检查 + 加载所有 context（**核心：3 个 context 来源**）
+### Phase 0: Pre-flight check + load all context (**core: 3 context sources**)
 
-1. 读 `.cheat-state.json` → 不存在则提示先跑 `/cheat-init`
-2. 读 `rubric_notes.md` 拿当前公式（粗打分用）
-3. 读 `script_patterns.md`——写 draft 时按 cheat sheet 选结构
-4. **读已有 prediction 文件**（含 init 时 import 的 reconstructed）作为 **context 来源 A**（用户自己历史）：
-   - 0 个 → A 为空
-   - ≥1 个 → A 有内容，提取 (title / 7 维 / 实绩)
-5. **读 `benchmark.md`**（如存在）作为 **context 来源 B**（对标账号）：
-   - `state.benchmark_status = imported` → B 有内容，提取对标账号的样本主题分布、调性、Pattern
-   - `state.benchmark_status = none / pending` → B 为空
-6. **读 `audience.md`**（如存在且非空骨架）作为 **受众镜子**：
-   - Confidence 🟡 以上（有真实复盘数据派生）→ 选题 / 写 draft 时作为"这个 persona 会在乎吗"的检验视角
-   - Confidence 🔴/🟠（空 / 仅 benchmark seed）→ 当弱参考，不当硬约束
-   - **不进粗打分**——audience.md 是 creative lens，粗打分仍只用 rubric。persona 影响"写什么 / 哪个角度"，不影响分数
-7. 检查用户的入参——是否含具体 topic / 经历，决定走 Mode A/B/C/Batch
+1. Read `.cheat-state.json` → if missing, tell the user to run `/cheat-init` first
+2. Read `rubric_notes.md` for the current formula (for rough scoring)
+3. Read `script_patterns.md` — pick a structure from the cheat sheet when writing a draft
+4. **Read existing prediction files** (including reconstructed ones imported at init) as **context source A** (the user's own history):
+   - 0 → A is empty
+   - ≥1 → A has content; extract (title / 7 dimensions / actual performance)
+5. **Read `benchmark.md`** (if it exists) as **context source B** (benchmark account):
+   - `state.benchmark_status = imported` → B has content; extract the benchmark's sample-topic distribution, tone, and patterns
+   - `state.benchmark_status = none / pending` → B is empty
+6. **Read `audience.md`** (if it exists and is not an empty skeleton) as the **audience mirror**:
+   - Confidence 🟡 or above (derived from real retro data) → use it as the "would this persona care?" check when choosing topics / writing drafts
+   - Confidence 🔴/🟠 (empty / benchmark-seeded only) → treat as a weak reference, not a hard constraint
+   - **Does not feed into rough scoring** — audience.md is a creative lens; rough scoring still uses only the rubric. The persona affects "what to write / which angle", not the score
+7. Check the user's input — whether it contains a concrete topic / experience, and decide Mode A/B/C/Batch
 
-**brainstorm 时的 context 优先级**（**Claude 判断**——下面是参考默认）：
+**Context priority during brainstorming** (**Claude judges** — the following is the reference default):
 
-- **A 主导**（用户自己数据）：当 Claude 判断用户数据已能驱动方向时（参考默认：`calibration_samples ≥ 10`，但 Claude 可以更早——如 N=5 但出现 ≥3 个与 benchmark 明显不一致的强样本）
-- **B 主导**（benchmark）：用户数据少 + benchmark 有内容时
-- **B 缺席**（benchmark 为空）+ 用户数据少：纯靠用户 input + 抓热点；明确告诉用户"没 benchmark 也没足够自己数据，建议跑 /cheat-learn-from 后再回来 brainstorm"
+- **A dominates** (the user's own data): when Claude judges that the user's data can already drive direction (reference default: `calibration_samples ≥ 10`, but Claude may act earlier — e.g. N=5 but with ≥3 strong samples that clearly diverge from the benchmark)
+- **B dominates** (benchmark): when the user has little data + the benchmark has content
+- **B absent** (benchmark empty) + the user has little data: rely purely on user input + trend fetching; explicitly tell the user "no benchmark and not enough of your own data — I suggest running /cheat-learn-from before brainstorming again"
 
-判断依据**不是死磕样本数**，而是看：
-- 用户最近 N 个样本的实绩**是否与 benchmark 的高表现样本类型一致**——一致说明 benchmark 仍有借鉴价值；不一致说明用户已经走自己的路
-- 用户的样本**多样性**——3 篇都是同类内容不算成熟；3 篇覆盖不同类目反而比 10 篇同类更可信
+The basis for judgment is **not a rigid sample count**, but:
+- Whether the user's last N samples' actual performance **matches the benchmark's high-performing sample types** — if so, the benchmark is still useful; if not, the user has gone their own way
+- The user's sample **diversity** — 3 pieces of the same type is not mature; 3 pieces across different categories is more credible than 10 of the same type
 
-### Phase 1: Mode 分流
+### Phase 1: Mode routing
 
-读用户输入，识别：
+Read the user's input and identify:
 
-**含具体名词 + 情绪 / 经历词**（"我昨天开会..." / "我看到 X 让我..." / "我对 Y 觉得..."）→ **Mode A**（深挖；如话题是时事，Phase 2A.5 询问要不要拉外部数据）
+**Contains a concrete noun + emotion / experience words** ("yesterday at the meeting..." / "I saw X and it made me..." / "I feel about Y...") → **Mode A** (dig deeper; if the topic is current events, Phase 2A.5 asks whether to pull external data)
 
-**含方向词但无具体内容**（"想做职场" / "AI 方向" / "婚恋"）→ **Mode B**（单问"为什么想做这个"——用户内省窗口，**不调任何热点工具**）
+**Contains a direction word but nothing concrete** ("want to do workplace" / "AI direction" / "relationships") → **Mode B** (ask only "why do you want to do this" — a window for the user's introspection; **do not call any trend tool**)
 
-**显式说没想法**（"不知道做什么" / "帮我想" / "随便给个"）→ **Mode C**（按 [data-source-routing.md](../../shared-references/data-source-routing.md) 调热点工具 + 用户挑 + 回到内省；都不行则走"聊经历"三选项兜底）
+**Explicitly says they have no idea** ("don't know what to make" / "help me think" / "just give me something") → **Mode C** (call trend tools per [data-source-routing.md](../../shared-references/data-source-routing.md) + user picks + back to introspection; if all fails, fall back to the "talk about experiences" three options)
 
-**显式 `--batch N`**（用户主动批量）→ **Batch Mode**
+**Explicit `--batch N`** (user asks for bulk) → **Batch Mode**
 
-**纯 `/cheat-seed` 无附加内容** → **询问入口问题**：
-
-```
-你今天想干嘛？
-
-- 有想做的主题 / 经历 → 直接告诉我（"我想做一条 X" / "我最近 X..."）
-- 知道大致方向 → 告诉我（"想做职场" / "AI 方向"）→ 我会单问你为啥想做
-- 完全没想法 → 说"帮我想"→ 我用 [aihot / trendradar] 拉今天的热点给你看
-- 批量搞定 → 说 "batch <N>"
-
-(我不会拿一堆开放问题追你——你给一句话我就开始)
-```
-
-注意这是**唯一的开放式问题**——只在用户**纯触发** `/cheat-seed` 时问。如果用户已经在触发词里给了内容（"/cheat-seed 我想做..." 或 "找选题 我最近开会..."），直接进 Mode A/B/C 不再问这一句。
-
-### Phase 2A: Mode A 深挖（用户给了具体 topic / 经历）
-
-**核心原则**：围绕用户给的内容**深挖**，**不要切到别的话题**。
-
-**反问类型（按场景挑）**：
-
-- 触发瞬间："你说 X 这件事，最初是哪个具体瞬间触发你想做的？" / "是什么让你觉得这值得讲一条视频？"
-- 情绪锚点："这里面最让你 [生气 / 觉得荒唐 / 觉得有意思] 的是哪个细节？"
-- 角度选择："你想说的是 [角度 a：现象批判] 还是 [角度 b：自我反思] 还是 [角度 c：泛化到普遍]？"
-- 受众想象："你心里想着是说给哪种人听？她/他听完会怎么想 / 怎么转发？"
-- 反对意见探测："如果有人反驳说 [反方观点 X]，你会怎么回？"——逼用户先想清楚立场
-
-**反问纪律**：
-- 一次只问 **1 个**问题（不要塞 3 个连珠炮）
-- 最多 `MAX_DEEP_DIVE_TURNS` 轮（默认 4）——超过就主动收敛："OK 我感觉够了，帮你提议一个角度试试"
-- 用户的回答如果含 emoji / 简短 / 不耐烦 → 立刻收敛，不要逼
-
-**收敛输出**：
+**Bare `/cheat-seed` with nothing else** → **ask the entry question**:
 
 ```
-我感觉这个角度能做：
+What do you want to do today?
 
-[一句话立意：50 字以内]
+- Have a subject / experience in mind → just tell me ("I want to make one about X" / "recently I X...")
+- Know the general direction → tell me ("want to do workplace" / "AI direction") → I'll ask you one question about why you want to do it
+- No idea at all → say "help me think" → I'll use [aihot / trendradar] to pull today's trends for you
+- Bulk → say "batch <N>"
 
-走法：
-- 用 [Pattern X 结构]（来自 script_patterns.md）
-- 钩子：[具体场景 / 句子]
-- 主体：[3 个观察是什么]
-- 收尾：[MVP 句方向]
-
-粗打分（v0 等权 7 维）：ER=X HP=X QL=X NA=X AB=X SR=X SAT=X → composite ≈ X.X
-Confidence: 🔴 极低 (你才校准 0/N 篇)
-
-要不要让我先写一份 draft？(yes / 换角度 / 我自己写)
+(I won't chase you with a pile of open questions — give me one sentence and I'll start)
 ```
 
-用户回 yes → Phase 4 写 draft。
-用户说"换角度" → 回 Phase 2A 深挖更多。
-用户说"我自己写" → 把 candidate 加进 candidates.md 标 tier1，结束。
+Note this is the **only open-ended question** — asked only when the user **barely triggers** `/cheat-seed`. If the user already provided content in the trigger phrase ("/cheat-seed I want to make..." or "find a topic, recently at the meeting..."), go straight to Mode A/B/C without asking this.
 
-### Phase 2B: Mode B — 单问"为什么"，触发用户内省
+### Phase 2A: Mode A deep dive (the user gave a concrete topic / experience)
 
-用户给了方向但不具体（"想做职场" / "AI 方向" / "婚恋"）。**这阶段不调任何热点工具**——是用户内省的窗口，外部信息会污染。
+**Core principle**: dig into what the user gave you; **do not switch to a different subject**.
 
-只问一个问题，**单刀直入**：
+**Follow-up types (pick per situation)**:
+
+- Trigger moment: "You said X — which specific moment first made you want to make this?" / "What made you feel this deserved a video?"
+- Emotional anchor: "Which detail in this made you most [angry / find it absurd / find it interesting]?"
+- Angle choice: "Do you want to say [angle a: critique the phenomenon] or [angle b: self-reflection] or [angle c: generalize to the universal]?"
+- Audience imagination: "Who do you picture listening? How would they feel / would they share it?"
+- Objection probing: "If someone objected with [opposing view X], how would you respond?" — forcing the user to think through their stance
+
+**Follow-up discipline**:
+- Ask only **1** question at a time (do not fire 3 in a row)
+- Cap at `MAX_DEEP_DIVE_TURNS` rounds (default 4) — beyond that, converge proactively: "OK I think I have enough, let me propose an angle"
+- If the user's reply contains emoji / is very short / sounds impatient → converge immediately; do not push
+
+**Convergence output**:
 
 ```
-为什么想做这个主题？
+I think this angle can work:
+
+[One-sentence thesis: under 50 words]
+
+Approach:
+- Use [Pattern X structure] (from script_patterns.md)
+- Hook: [specific scene / line]
+- Body: [what the 3 observations are]
+- Ending: [direction for the MVP line]
+
+Rough score (v0 equal-weight 7 dimensions): ER=X HP=X QL=X NA=X AB=X SR=X SAT=X → composite ≈ X.X
+Confidence: 🔴 Very low (you've only calibrated 0/N pieces)
+
+Want me to write a draft first? (yes / change angle / I'll write it myself)
 ```
 
-不要问"a/b/c 三种例子"——那是 dump 选项让用户挑，破坏内省。让用户自己组织语言。
+User says yes → Phase 4 writes the draft.
+User says "change angle" → back to Phase 2A, dig deeper.
+User says "I'll write it myself" → add the candidate to candidates.md marked tier1, end.
 
-**根据用户回答分流**：
+### Phase 2B: Mode B — ask only "why", triggering the user's introspection
 
-| 用户答 | 分类 | 行为 |
+The user gave a direction but nothing concrete ("want to do workplace" / "AI direction" / "relationships"). **Do not call any trend tool in this phase** — it is a window for the user's introspection; external information contaminates it.
+
+Ask one question, **straight to the point**:
+
+```
+Why do you want to make this topic?
+```
+
+Do not offer "a/b/c three examples" — that dumps options for the user to pick and breaks introspection. Let the user form their own words.
+
+**Route by the user's answer**:
+
+| User answer | Classification | Behavior |
 |---|---|---|
-| 含具体经历 / 个人卡点（"我自己经常加班" / "我看到 X 让我..."） | **真动机** | 转 Mode A 深挖（Phase 2A） |
-| 抽象热度归因（"这话题最近热" / "别人都在做" / "听说能涨粉"） | **空动机** | 反问"那你自己对这个话题最有感觉的角度是啥？"——逼出个人 stake；继续空 → 转 Mode C |
-| "我也不知道" / "朋友说赚钱" / 模糊推搡 | **真没想法** | 直接转 Mode C |
+| Contains a concrete experience / personal sticking point ("I work overtime a lot myself" / "I saw X and it made me...") | **Real motive** | Switch to Mode A deep dive (Phase 2A) |
+| Abstract popularity attribution ("this topic is hot lately" / "everyone is doing it" / "I heard it grows followers") | **Empty motive** | Ask back "then what angle on this topic do you personally feel most strongly about?" — force out a personal stake; still empty → switch to Mode C |
+| "I don't know either" / "a friend said it makes money" / vague deflection | **Genuinely no idea** | Switch directly to Mode C |
 
-**反问纪律**：最多 2 轮。第 2 轮还问不出真动机 → 直接转 Mode C，**不要无限挖**。
+**Follow-up discipline**: at most 2 rounds. If the 2nd round still yields no real motive → switch directly to Mode C; **do not dig forever**.
 
-> 设计意图：Mode B 是"过滤器"，不是"工厂"。用户来这里要么暴露真实动机（→ 进 Mode A）要么暴露自己其实没想法（→ 进 Mode C）。两条都比硬要在 Mode B 里产出选题更好。
+> Design intent: Mode B is a "filter", not a "factory". Users come here either to reveal their real motive (→ Mode A) or to reveal that they actually have no idea (→ Mode C). Both beat forcing a topic out of Mode B.
 
-### Phase 2C: Mode C — 外部素材 + 用户挑 + 回到内省
+### Phase 2C: Mode C — external material + user picks + back to introspection
 
-用户完全没想法（直接显式说 / 从 Mode B 转过来）。**这是唯一默认调热点工具的入口**。
+The user has no idea at all (said so explicitly / arrived from Mode B). **This is the only entry point that calls trend tools by default**.
 
-按 [shared-references/data-source-routing.md](../../shared-references/data-source-routing.md) 的路由规则：
+Per the routing rules in [shared-references/data-source-routing.md](../../shared-references/data-source-routing.md):
 
-1. **拉外部素材**（按 `content_form` 选 trend source）：
-   - `tutorial-builder` / AI 类 → 调 aihot skill
-   - `opinion-video` / `long-essay` / `podcast` / `other` → 调 trendradar-mcp（如启用）
-   - `mixed` → 两个都调
-   - 都不可用 → 走 manual-paste（询问用户："今天看到啥可以拍的？粘几条 URL/标题"）
+1. **Pull external material** (pick a trend source by `content_form`):
+   - `tutorial-builder` / AI-related → call the aihot skill
+   - `opinion-video` / `long-essay` / `podcast` / `other` → call trendradar-mcp (if enabled)
+   - `mixed` → call both
+   - Neither available → manual-paste (ask the user: "what did you see today that could be filmed? Paste a few URLs/titles")
 
-2. **聊经历兜底**（用户拒绝看外部素材 / 外部素材都不感兴趣）：
-
-   ```
-   外部素材你都没感觉，那回到你自己。三个开口，挑一个开始讲：
-
-   a) 你最近真实接触到的某件具体事？（"上周我看到我同事 X..."）
-   b) 你最近读到 / 看到的某条让你想吐槽的内容？（"知乎上有个回答..."）
-   c) 你长期琢磨的某个 unsolved 困惑？（"我一直没想明白为啥 X..."）
-
-   随便挑一个开始讲。
-   ```
-
-3. **拉到外部素材后**，用 rubric 粗筛 + 按 content_form 过滤，留 5 条最契合的：
+2. **Fall back to talking about experiences** (user refuses external material / is not interested in any of it):
 
    ```
-   今天这 5 个跟你形态契合：
-   1. [标题 A]（来源: trendradar / 微博热搜 / hot_score: 8.5）
-   2. [标题 B]（来源: aihot / 模型类 / 精选）
+   None of the external material resonates, so come back to yourself. Three openings — pick one and start talking:
+
+   a) Something concrete you encountered recently? ("last week I saw my colleague X...")
+   b) Something you read / saw recently that made you want to complain? ("there's an answer on Zhihu...")
+   c) An unsolved confusion you've been chewing on? ("I've never understood why X...")
+
+   Pick any one and start talking.
+   ```
+
+3. **After pulling external material**, rough-filter with the rubric + filter by content_form, keeping the 5 best fits:
+
+   ```
+   These 5 fit your form today:
+   1. [Title A] (source: trendradar / Weibo hot search / hot_score: 8.5)
+   2. [Title B] (source: aihot / model category / featured)
    3. ...
 
-   你哪个最有感觉？没感觉就回 '都没'，我换方向问。
+   Which one resonates most? If none, reply "none" and I'll ask from another direction.
    ```
 
-4. **用户挑了一条 → 回到内省**：
+4. **User picks one → back to introspection**:
 
    ```
-   OK [标题 X]。你为啥对这条最有感觉？
-   是 [angle1] 还是 [angle2] 还是别的？
+   OK [Title X]. Why does this one resonate most with you?
+   Is it [angle1] or [angle2] or something else?
    ```
 
-   → 用户答 → 转 Mode A 深挖。
+   → user answers → switch to Mode A deep dive.
 
-5. **用户回 "都没"** → 转回 Mode C 第 2 步的"聊经历兜底"。
+5. **User replies "none"** → go back to Mode C step 2's "talk about experiences" fallback.
 
-**关键**：热点不是"塞 5 候选让用户挑"，是"给材料 + 强制问用户的个人 stake"——AI 不替用户决定哪条最值得做。
+**Key**: trends are not "dump 5 candidates for the user to pick", but "give material + force the question of the user's personal stake" — the AI does not decide for the user which one is worth making.
 
-### Phase 2A.5: Mode A 灰色场景 — 用户讲了时事话题
+### Phase 2A.5: Mode A gray area — the user raised a current-events topic
 
-Mode A 默认深挖用户经历。但如果**用户讲的本身是时事话题**（产品名 + 时间词 / 人名 + 事件词），按 [data-source-routing.md](../../shared-references/data-source-routing.md) 的"时事判定"规则，**询问**用户要不要拉外部数据作参考：
-
-```
-💡 [话题] 是时事——我可以拉一下今天的舆论风向（各平台情绪 + 主要 angles）作参考。
-
-要看吗？回 '看' 我调；回 '不用' 我直接跟你深挖你的角度。
-```
-
-用户回 "看" → 调对应 trend source → 把数据 inline 到深挖 context；
-用户回 "不用" → 标准 Mode A 深挖，不动外部数据。
-
-**永远不主动调**——用户的 angle 优先于外部数据，避免外部信息**带偏**用户视角。
-
-### Phase 2D: Batch Mode（用户显式 `--batch N`）
-
-**保留旧 brainstorm 流程**：
-
-1. 问 3 个清单问题（兴趣 / 调性 / 红线）—— Batch 模式才问这些
-2. 抓热点 + Claude brainstorm 15 候选
-3. 用户挑 N
-4. 写 N 份 draft 到 scripts/——**每份都走 Phase 4 的段落版格式 + Phase 4.5 自检**（line-format + humanizer），不因为批量就跳过
-
-详见 commit history（旧 cheat-seed 的 Phase 1-3）。这是 escape hatch，不是默认。
-
-### Phase 3: 计算 candidate ID + 落候选池
-
-不管 Mode A/B/C 哪条路径，确认角度后：
-
-1. 算 candidate id：`sha256("seed-" + 立意 + 触发时间)[:12]`
-2. 写一行 entry 到 `candidates.md`（按 [candidate-schema.md](../../shared-references/candidate-schema.md) 格式）
-3. 标 `tier=tier1` + `read_status=deep_read`（已经讨论过，不是 skim）
-
-### Phase 4: 写 draft
-
-`WITH_DRAFT=yes` → 顺次写到 `scripts/<YYYY-MM-DD>_<id>_<short-title>.md`：
-
-**写 draft 前必读** `script_patterns.md` —— 按"结构选型 cheat sheet"对应用户的 topic 选合适结构。如果文件还在抽象骨架阶段（用户没填几个 pattern），就用 starter rubric 对应的通用框架。
-
-**字数**：按 `DRAFT_LENGTH` 派生（基于 `typical_duration_seconds`）。
-
-#### ⚠️ 正文必须是段落版，不是字幕格式（**最常见的生成跑偏**）
-
-模型的训练先验会把"视频脚本"默认写成提词器/字幕的短行格式。**这是错的**——cheat-seed 的 draft 是给用户**改写**的散文稿，不是拍摄字幕。字幕是剪映拍后自动断的，不是写作时的形态。
-
-生成正文时，眼睛盯住下面这个对照：
+Mode A deep-dives the user's experience by default. But if **what the user raised is itself a current-events topic** (a product name + time word / a person's name + event word), per the "current-events detection" rules in [data-source-routing.md](../../shared-references/data-source-routing.md), **ask** whether the user wants external data as reference:
 
 ```
-❌ 字幕格式（不要这样写）：
-你有没有发现
-所有审稿人都在说一样的话
-你的研究太老套了
-但你仔细看
-他们引用的全是 5 年前的反应
+💡 [Topic] is current events — I can pull today's public-opinion climate (sentiment across platforms + the main angles) as reference.
 
-✅ 段落版（必须这样写）：
-你有没有发现，所有审稿人都在说一样的话——你的研究太老套了。但你仔细看，他们引用的全是 5 年前的反应。AI 不是新东西，新的是这次大家集体觉醒了。
+Want to see it? Reply "see it" and I'll fetch; reply "no need" and I'll dig straight into your angle.
 ```
 
-规则：
-- **每段 100-300 字**，逗号 / 句号 / 破折号自然连，**不在句子边界硬断行**
-- 段与段之间空一行（自然的主题切换才换段）
-- 一份 draft 正文一般 3-6 段，**不该有几十个单句行**
+User replies "see it" → call the matching trend source → inline the data into the deep-dive context;
+User replies "no need" → standard Mode A deep dive, no external data.
 
-#### 格式：
+**Never fetch proactively** — the user's angle takes priority over external data, to avoid external information **biasing** the user's perspective.
+
+### Phase 2D: Batch Mode (user explicitly passes `--batch N`)
+
+**Keeps the old brainstorm flow**:
+
+1. Ask the 3 checklist questions (interests / tone / red lines) — only Batch mode asks these
+2. Fetch trends + Claude brainstorms 15 candidates
+3. User picks N
+4. Write N drafts into scripts/ — **each one still goes through Phase 4's paragraph format + Phase 4.5 self-check** (line-format + humanizer); do not skip just because it is batch
+
+See the commit history (the old cheat-seed Phases 1-3) for details. This is an escape hatch, not the default.
+
+### Phase 3: Compute the candidate ID + write to the candidate pool
+
+Whichever of Mode A/B/C the path took, after the angle is confirmed:
+
+1. Compute the candidate id: `sha256("seed-" + thesis + trigger time)[:12]`
+2. Write one entry line into `candidates.md` (per the [candidate-schema.md](../../shared-references/candidate-schema.md) format)
+3. Mark `tier=tier1` + `read_status=deep_read` (already discussed, not skimmed)
+
+### Phase 4: Write the draft
+
+`WITH_DRAFT=yes` → write in sequence to `scripts/<YYYY-MM-DD>_<id>_<short-title>.md`:
+
+**Read `script_patterns.md` before writing** — pick the right structure for the user's topic from the "structure selection cheat sheet". If the file is still an abstract skeleton (the user has filled in few patterns), use the generic framework from the starter rubric.
+
+**Word count**: derived from `DRAFT_LENGTH` (based on `typical_duration_seconds`).
+
+#### ⚠️ The body must be paragraphs, not subtitle format (**the most common generation drift**)
+
+The model's training prior turns "video script" into teleprompter/subtitle short lines by default. **That is wrong** — cheat-seed's draft is a prose draft for the user to **rewrite**, not shooting subtitles. Subtitles are auto-broken by CapCut after shooting, not the form at writing time.
+
+When generating the body, keep this contrast in view:
+
+```
+❌ Subtitle format (do not write like this):
+Have you noticed
+all reviewers are saying the same thing
+your research is too old-fashioned
+but look closely
+everything they cite is a reaction from 5 years ago
+
+✅ Paragraph version (you must write like this):
+Have you noticed that all reviewers are saying the same thing — your research is too old-fashioned. But look closely: everything they cite is a reaction from 5 years ago. AI is not new; what's new is that this time everyone woke up at once.
+```
+
+Rules:
+- **Each paragraph 100-300 words**, linked naturally with commas / periods / dashes, **no hard line breaks at sentence boundaries**
+- A blank line between paragraphs (start a new paragraph only on a natural topic shift)
+- A draft body is usually 3-6 paragraphs; **it should not have dozens of single-sentence lines**
+
+#### Format:
 
 ```markdown
-# [立意标题]
+# [Thesis title]
 
-> ⚠️ **Draft by Claude — 你必须改写后再拍**
+> ⚠️ **Draft by Claude — you must rewrite it before shooting**
 >
-> 这是脚手架，不是成品。你的语气 / 节奏 / 个人经历无法 AI 生成。
-> 改写流程：
-> 1. **直接在本文件改写**（同 path：scripts/<...>.md）
->    - 加你的语气、个人经历、真实金句
->    - 砍铺垫、砍模型缩写、砍学术包装
-> 2. 改完后跑 `/cheat-predict scripts/<本文件>.md`
-> 3. 拍完跑 `/cheat-shoot scripts/<本文件>.md`
+> This is scaffolding, not a finished piece. Your tone / rhythm / personal experience cannot be AI-generated.
+> Rewrite process:
+> 1. **Rewrite directly in this file** (same path: scripts/<...>.md)
+>    - Add your tone, personal experience, real quotable lines
+>    - Cut the setup, cut model abbreviations, cut academic packaging
+> 2. When done, run `/cheat-predict scripts/<this file>.md`
+> 3. After shooting, run `/cheat-shoot scripts/<this file>.md`
 
-**Article ID**: <12 位 hash>
-**调性**: [基于讨论得出的，不是清单 Q]
-**目标时长**: <state.typical_duration_seconds 转换> 分钟
-**目标字数**: <按时长派生>
-**结构选型**: [按 script_patterns.md 的 cheat sheet 显式标，如 "metaphor 优先" / "数据反转开场"]
-**用到的 patterns**: [编号 + 简短说明]
-**讨论种子**: [一句话回顾 deep dive 出来的核心]
+**Article ID**: <12-char hash>
+**Tone**: [derived from the discussion, not from a checklist Q]
+**Target duration**: <state.typical_duration_seconds converted> minutes
+**Target word count**: <derived from duration>
+**Structure choice**: [explicitly mark per the cheat sheet in script_patterns.md, e.g. "metaphor first" / "data-reversal opening"]
+**Patterns used**: [number + short description]
+**Discussion seed**: [one sentence recapping the core of the deep dive]
 
 ---
 
-[draft 正文 —— **段落版**，3-6 段，每段 100-300 字，不是单句碎行]
+[draft body — **paragraph version**, 3-6 paragraphs, each 100-300 words, not single-sentence fragments]
 ```
 
-`WITH_DRAFT=no`（用户说"我自己写"）→ 跳过 Phase 4 + Phase 4.5。
+`WITH_DRAFT=no` (user says "I'll write it myself") → skip Phase 4 + Phase 4.5.
 
-### Phase 4.5: draft 自检 pass（版式 + 去 AI 味）
+### Phase 4.5: Draft self-check pass (layout + de-AI-ification)
 
-draft 写完落盘后、**在展示给用户前**跑两步自检。**顺序固定：先 4.5a 修版式，再 4.5b 去 AI 味**——humanizer 处理散文，喂它字幕格式的碎行会乱。
+After the draft is written and saved, **before showing it to the user**, run two self-checks. **Sequence is fixed: 4.5a fixes layout first, then 4.5b removes AI tells** — humanizer works on prose, and feeding it subtitle-format fragments makes a mess.
 
-**为什么安全**（不污染校准）：cheat-seed 的 draft 不是被预测/发布的东西——用户改写后、cheat-predict 打分的是**用户最终稿**。这两步只是给用户更干净的起点。
+**Why it is safe** (does not contaminate calibration): cheat-seed's draft is not what gets predicted/published — after the user rewrites, cheat-predict scores **the user's final draft**. These two steps just give the user a cleaner starting point.
 
-#### Phase 4.5a: line-format 自检（字幕格式 → 段落版）
+#### Phase 4.5a: line-format self-check (subtitle format → paragraph version)
 
-Phase 4 的散文指令 + ❌/✅ 对照已经在生成时压先验，但生成仍可能跑偏。这一步是**确定性兜底**：
+Phase 4's prose instruction + ❌/✅ contrast already pushes the prior down during generation, but generation can still drift. This step is the **deterministic backstop**:
 
 ```bash
-# 只看正文段（--- 分隔线之后）
+# Only look at the body section (after the --- divider)
 body=$(awk '/^---$/{f=1;next} f' scripts/<id>.md)
-line_count=$(printf '%s\n' "$body" | grep -c .)        # 非空行数
+line_count=$(printf '%s\n' "$body" | grep -c .)        # non-empty line count
 char_count=$(printf '%s' "$body" | wc -m | tr -d ' ')
 avg_chars_per_line=$(( char_count / (line_count > 0 ? line_count : 1) ))
 ```
 
-判定：**`avg_chars_per_line < 15` 且 `line_count >= 8`** → 判定为字幕格式 → **自动重排**：
-- 把句子边界的硬断行合并回自然段落
-- 按主题切换分 3-6 段，每段 100-300 字
-- 用 Edit 替换正文段（header 不动）
-- 在 Phase 5 输出里标一行："📐 检测到字幕格式，已重排为段落版"
+Decision: **`avg_chars_per_line < 15` and `line_count >= 8`** → judged as subtitle format → **auto-reflow**:
+- Merge hard line breaks at sentence boundaries back into natural paragraphs
+- Split into 3-6 paragraphs by topic shifts, each 100-300 words
+- Replace the body section with Edit (header untouched)
+- Add a line to the Phase 5 output: "📐 Subtitle format detected; reflowed into paragraphs"
 
-不命中 → 跳过，正文已经是段落版。
+No hit → skip; the body is already paragraphs.
 
-#### Phase 4.5b: humanizer 去 AI 味
+#### Phase 4.5b: humanizer de-AI-ification
 
-`HUMANIZE_DRAFT=on`（默认）—— 用 `humanizer` skill 过一遍。Claude 自己写的初稿天然带 AI tells（em-dash 滥用 / rule of three / "inflated" 词汇 / 空泛归因 / -ing 浅层分析），这一步把它们清掉。
+`HUMANIZE_DRAFT=on` (default) — run it through the `humanizer` skill. Claude's own first drafts naturally carry AI tells (em-dash overuse / rule of three / "inflated" vocabulary / vague attributions / shallow -ing analysis); this step clears them.
 
-步骤：
+Steps:
 
-1. 检查 `humanizer` skill 是否可用（`~/.claude/skills/humanizer/` 存在）：
-   - 不可用 → 跳过 4.5b，在 Phase 5 输出里加一行"（humanizer 未装，draft 是原始 AI 版——`git clone https://github.com/blader/humanizer` 到 ~/.claude/skills/ 可启用自动去 AI 味）"
-2. 可用 → 通过 Skill tool 调 `humanizer`，**只传 draft 正文**（`---` 分隔线之后、4.5a 已重排好的段落版），**绝不传 header**：
-   - header 的 `⚠️ Draft by Claude — 你必须改写后再拍` 警告是**有意的脚手架标记**，不是要 humanize 的散文
-   - **voice calibration**：如果用户有历史脚本（`videos/*/script.md`）或填过 `script_patterns.md`，把最近 1-2 份作为 humanizer 的 voice 参考样本一起传——让它往"**这个用户的声音**"靠，而不是"通用人声"
-3. humanizer 返回去 AI 味的正文 → 用 Edit 替换 draft 文件的正文段（header 不动）
-4. 记录 humanizer 报告的"修了哪些 tell"（如 `em-dash 滥用 ×3 / rule of three ×2 / inflated 词汇: "深刻" "本质上"`），Phase 5 输出里展示
+1. Check whether the `humanizer` skill is available (`~/.claude/skills/humanizer/` exists):
+   - Unavailable → skip 4.5b and add a line to the Phase 5 output: "(humanizer not installed; the draft is the raw AI version — `git clone https://github.com/blader/humanizer` into ~/.claude/skills/ to enable automatic de-AI-ification)"
+2. Available → invoke `humanizer` via the Skill tool, **passing only the draft body** (after the `---` divider, the paragraph version already reflowed by 4.5a), **never the header**:
+   - The header's `⚠️ Draft by Claude — you must rewrite it before shooting` warning is an **intentional scaffolding marker**, not prose to humanize
+   - **Voice calibration**: if the user has historical scripts (`videos/*/script.md`) or has filled in `script_patterns.md`, pass the latest 1-2 as voice reference samples to humanizer — so it leans toward "**this user's voice**", not "generic human voice"
+3. humanizer returns the de-AI-ified body → use Edit to replace the draft file's body section (header untouched)
+4. Record the "tells fixed" reported by humanizer (e.g. `em-dash overuse ×3 / rule of three ×2 / inflated vocabulary: "profound" "essentially"`), and show them in the Phase 5 output
 
-**纪律**：
-- humanizer 是**去 AI 味**，不是**替用户改写**。它让 draft 不那么像机器写的，但**仍不是用户的声音**——header 的"必须改写"警告依然成立，Phase 5 输出要重申
-- 如果 humanizer 把某句改得偏离了 `结构选型` / 用到的 pattern → 以 pattern 为准，那句回滚（pattern 是和用户讨论定的，humanizer 不该推翻）
-- humanizer **不负责版式**——断行问题在 4.5a 已经修完，humanizer 拿到的已是段落版
+**Discipline**:
+- humanizer **removes AI tells**; it does not **rewrite for the user**. It makes the draft less machine-written, but **it is still not the user's voice** — the header's "must rewrite" warning still holds, and the Phase 5 output must restate it
+- If humanizer changes a sentence so it drifts from the `Structure choice` / patterns used → the pattern wins; roll that sentence back (the pattern was agreed with the user; humanizer should not overturn it)
+- humanizer **does not handle layout** — line-break issues were fixed in 4.5a; humanizer already receives the paragraph version
 
-### Phase 5: 输出"下一步" + 询问继续
+### Phase 5: Output "next steps" + ask whether to continue
 
 ```
-✅ Draft 写完：scripts/2026-05-04_<id>_<short>.md
-📐 版式自检：通过（段落版）  ← 或"检测到字幕格式，已重排为段落版"
-🧹 humanizer 过了一遍：修了 em-dash 滥用 ×3 / rule of three ×2 / inflated 词汇 2 处
-   （draft 现在不那么"机器味"了——但这仍是脚手架，不是你的声音）
+✅ Draft written: scripts/2026-05-04_<id>_<short>.md
+📐 Layout self-check: passed (paragraph version)  ← or "subtitle format detected; reflowed into paragraphs"
+🧹 humanizer pass: fixed em-dash overuse ×3 / rule of three ×2 / inflated vocabulary ×2
+   (the draft is less "machine-flavored" now — but it is still scaffolding, not your voice)
 
-接下来你可以：
-- 改写这份 draft（直接在原文件改）—— 加你的语气、经历、真实金句
-- 改完跑 "打分这篇 scripts/<...>.md" 看 7 维评分
-- 决定要拍 → "启动预测 scripts/<...>.md"
+Next you can:
+- Rewrite this draft (edit the file directly) — add your tone, experience, real quotable lines
+- When done, run "score this scripts/<...>.md" to see the 7-dimension score
+- Decide to shoot → "start prediction scripts/<...>.md"
 
-下一篇你想做什么？
-（直接告诉我具体经历 / topic，或者说"今天就这样"结束）
+What do you want to do next?
+(Tell me a concrete experience / topic directly, or say "that's it for today" to finish)
 ```
 
-> humanizer 那行只在 `HUMANIZE_DRAFT=on` 且 skill 可用时出现。未装时换成一行提示如何启用。
+> The humanizer line appears only when `HUMANIZE_DRAFT=on` and the skill is available. When not installed, replace it with a line explaining how to enable it.
 
-用户说"今天就这样" → 结束 cheat-seed。
-用户给新 topic → 回 Phase 1 重新分流。
+User says "that's it for today" → end cheat-seed.
+User gives a new topic → back to Phase 1 for routing.
 
 ## Key Rules
 
-1. **AI 不主动开放问**——只在用户纯触发 `/cheat-seed` 时问一次入口问题，其他时候**等用户给输入再深挖**
-2. **一次一个选题**——默认 Mode A/B/C 都给 1 个建议；用户主动要批量才走 Batch
-3. **反问纪律**：一次问 1 个，最多 4 轮，用户不耐烦立刻收敛
-4. **深挖围绕用户给的话题**，不要切到别的——你说"开会被领导骂"，AI 不该问"那你最近有没有觉得 AI 让大家..."这种平行话题
-5. **写 draft 必须读 script_patterns.md**——按用户已有 pattern 选结构
-6. **draft 是脚手架**——header 加醒目警告"必须改写"
-7. **humanizer 只去 AI 味，不替用户改写**——Phase 4.5b 让 draft 不那么机器味，但它仍不是用户的声音；"必须改写"的警告不因为过了 humanizer 就失效
-8. **正文是段落版不是字幕格式**——生成时盯 Phase 4 的 ❌/✅ 对照；Phase 4.5a 用 `avg_chars_per_line < 15 且行数 ≥ 8` 做确定性兜底，命中就重排。字幕是剪映拍后自动断的，不是写作时的形态
+1. **The AI does not open with questions** — it asks the entry question once only when the user barely triggers `/cheat-seed`; otherwise **wait for user input, then dig deeper**
+2. **One topic at a time** — Modes A/B/C all give 1 suggestion by default; go to Batch only when the user explicitly asks for bulk
+3. **Follow-up discipline**: 1 question at a time, at most 4 rounds, converge immediately when the user is impatient
+4. **Dig into the topic the user gave**; do not switch — if the user says "my boss yelled at me in a meeting", the AI should not ask "so have you recently felt AI makes everyone...", a parallel topic
+5. **Read script_patterns.md before writing a draft** — pick a structure from the user's existing patterns
+6. **The draft is scaffolding** — the header carries a prominent "must rewrite" warning
+7. **humanizer only removes AI tells; it does not rewrite for the user** — Phase 4.5b makes the draft less machine-flavored, but it is still not the user's voice; the "must rewrite" warning does not expire because it passed through humanizer
+8. **The body is paragraph version, not subtitle format** — watch the ❌/✅ contrast in Phase 4 while generating; Phase 4.5a uses `avg_chars_per_line < 15 and line count ≥ 8` as the deterministic backstop and reflows on a hit. Subtitles are auto-broken by CapCut after shooting, not the form at writing time
 
 ## Refusals
 
-- 「跳过深挖，直接写 draft」 → 询问"你想直接给主题让我写吗？OK 但 draft 质量可能差——我不知道你的角度。给我一句话立意我就写"
-- 「AI 替我决定 topic」 → 拒绝。Mode A/B/C 路径里 AI 永远只**呈现外部素材** + **问用户角度**，不替用户拍板"做哪条"
-- 「Mode B 我懒得回答为什么，直接给我 5 个候选吧」 → 拒绝。Mode B 的"为什么"是过滤器——你答不出来就不该用 Mode B 的方向。要么进 Mode A 给具体经历，要么进 Mode C 我帮你找素材
-- 「Mode A 时直接帮我拉热点，不问我同意」 → 拒绝。Mode A 用户已经有 angle，未经允许拉外部数据会污染他的视角。详见 [data-source-routing.md](../../shared-references/data-source-routing.md)
-- 「一次写 5 个 draft」 → 不在默认流程。用户必须显式 `--batch 5`
-- 「我懒得改写，直接拍 AI draft」 → 警告"AI 直接生成的稿子拍出来 ER 偏低，会污染你的校准数据"，但用户坚持也允许（标 `unmodified_ai_draft: true`）
+- "Skip the deep dive, just write the draft" → ask "Do you want to just give me the topic and have me write it? OK, but the draft quality may suffer — I don't know your angle. Give me a one-sentence thesis and I'll write"
+- "AI decides the topic for me" → refuse. In Modes A/B/C the AI always only **presents external material** + **asks the user's angle**; it does not decide "which one to make" for the user
+- "I can't be bothered to answer why in Mode B; just give me 5 candidates" → refuse. Mode B's "why" is a filter — if you cannot answer it, you should not use Mode B's direction. Either go to Mode A with a concrete experience, or go to Mode C and I'll help you find material
+- "In Mode A, just pull trends without asking me" → refuse. In Mode A the user already has an angle; pulling external data without permission contaminates their perspective. See [data-source-routing.md](../../shared-references/data-source-routing.md)
+- "Write 5 drafts at once" → not in the default flow. The user must explicitly pass `--batch 5`
+- "I can't be bothered to rewrite; I'll shoot the AI draft directly" → warn "a directly AI-generated script tends to score low on ER and will contaminate your calibration data", but allow it if the user insists (mark `unmodified_ai_draft: true`)
 
 ## Integration
 
-- 上游：`/cheat-init` Phase 5 末尾在 `pool_status=none + calibration_samples=0` 时主动询问"现在跑 /cheat-seed？"
-- 上游：`/cheat-recommend` 在 candidates 空时引导文案中提及 `/cheat-seed`
-- 上游：`/cheat-status` 在 `pool_status=none + 距 init >24h` 时提示"还没拍——跑 /cheat-seed？"
-- 下游：用户的 candidate → candidates.md（tier1，已 deep_read）
-- 下游：（默认）draft → Phase 4.5 humanizer 去 AI 味 → scripts/<id>.md → 用户改写 → /cheat-predict
-- 可选依赖：[`humanizer`](https://github.com/blader/humanizer) skill（MIT，外部项目）。装在 `~/.claude/skills/humanizer/` 时 Phase 4.5 自动启用；未装则优雅跳过。**不打包进 cheat-on-content**——用户自己 clone
-- 与 `/cheat-trends` 区别：cheat-seed 是**讨论 + 写 draft**（重 conversation）；cheat-trends 是**多 adapter 抓 + 粗打分**（重 fetch）。两者目的不同，不互相替代。
+- Upstream: at the end of `/cheat-init` Phase 5, when `pool_status=none + calibration_samples=0`, it proactively asks "run /cheat-seed now?"
+- Upstream: `/cheat-recommend` mentions `/cheat-seed` in its guidance copy when candidates is empty
+- Upstream: `/cheat-status` prompts "haven't shot anything yet — run /cheat-seed?" when `pool_status=none + >24h since init`
+- Downstream: the user's candidate → candidates.md (tier1, deep_read already done)
+- Downstream: (default) draft → Phase 4.5 humanizer de-AI-ification → scripts/<id>.md → user rewrites → /cheat-predict
+- Optional dependency: the [`humanizer`](https://github.com/blader/humanizer) skill (MIT, external project). When installed at `~/.claude/skills/humanizer/`, Phase 4.5 is enabled automatically; otherwise it is skipped gracefully. **Not bundled into cheat-on-content** — the user clones it themselves
+- Difference from `/cheat-trends`: cheat-seed is **discussion + draft writing** (conversation-heavy); cheat-trends is **multi-adapter fetching + rough scoring** (fetch-heavy). Different purposes; they do not replace each other.

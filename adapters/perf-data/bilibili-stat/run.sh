@@ -8,10 +8,11 @@
 #   bash run.sh <bvid_or_url> <video_folder> [<script_path>]
 #
 # Example:
-#   bash run.sh BV1cUoUY9Ecr ~/my-channel/videos/2026-05-04_BV1cUoUY9Ecr_AI接入MC
+#   bash run.sh BV1cUoUY9Ecr ~/my-channel/videos/2026-05-04_BV1cUoUY9Ecr_AI-integrated-MC
 #
-# B站视频数据(view)与评论(reply)都是公开接口——无需登录、无需 wbi 签名、无需浏览器。
-# 纯 httpx，因此这个 adapter 没有 `crawler.py login` 步骤，clone 下来配好依赖即可用。
+# Bilibili's video data (view) and comments (reply) are both public APIs — no login,
+# no wbi signature, no browser. Pure httpx, so this adapter has no `crawler.py login`
+# step; clone it, install the dependencies, and it works.
 #
 # Output: writes report.md INTO the video_folder.
 # Exit codes:

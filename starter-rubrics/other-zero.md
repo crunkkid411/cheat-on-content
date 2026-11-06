@@ -1,149 +1,149 @@
-# Starter Rubric：通用 / 未分类内容 — v0 cold-start 占位
+# Starter Rubric: generic / uncategorized content — v0 cold-start placeholder
 
-> **⚠️ 这是通用 catch-all rubric——当你的内容形式不属于观点视频、长文、短文、播客、教程中的任何一种时使用。**
+> **⚠️ This is a generic catch-all rubric — use it when your content form is not any of opinion video, long essay, short text, podcast, or tutorial.**
 >
-> **它的维度定义是从"观点类视频"原样搬来的，没有针对你的具体内容形式做任何适配。** 你应该在使用时**大幅调整权重和维度解释**——不要把这份 rubric 当成"已经为你定制好的"。
+> **Its dimension definitions were copied verbatim from "opinion video" and have not been adapted to your specific content form at all.** You should **heavily adjust the weights and dimension explanations** when using it — do not treat this rubric as "already customized for you".
 >
-> 如果你的内容形式已经稳定（比如固定做图文测评、Vlog、知识地图、newsletter），强烈建议在第 5 篇 bump 时**重新定义维度**而不是只调权重。
+> If your content form is already stable (e.g. you consistently make image-text reviews, Vlogs, knowledge maps, newsletters), it is strongly recommended to **redefine the dimensions** at the 5th-piece bump instead of only tuning weights.
 
-**这是给完全没数据的新博主用的占位 rubric。**它会打错。**前 5 篇预测精度大概 ±50%——这是 cold-start 的数学事实，不是 rubric 失败**。
+**This is a placeholder rubric for new creators with absolutely no data.** It will score things wrong. **Prediction accuracy for the first 5 pieces is roughly ±50% — that is a mathematical fact of cold-start, not a rubric failure.**
 
-跑完 5 篇（每篇都走完 `/cheat-predict` → 发布 → `/cheat-retro` 闭环）之后，你会有第一份个人校准数据，可以提议第一次 `/cheat-bump` 升级到 v1。
+After running 5 pieces (each completing the `/cheat-predict` → publish → `/cheat-retro` loop), you will have your first personal calibration data and can propose the first `/cheat-bump` to v1.
 
 ---
 
-## v0 综合分公式（**等权占位**）
+## v0 composite formula (**equal-weight placeholder**)
 
 ```
 composite = (ER + HP + QL + NA + AB + SR + SAT) / 7 × 2.0
 ```
 
-每个维度 0-5 整数分。综合分范围 0-10。
+Each dimension is an integer 0-5. The composite range is 0-10.
 
-**为什么等权**：你没有数据支持任何特定权重。等权能让你在数据出来之前对每个维度都给"中立的关注"。第 5 篇之后你的复盘数据会告诉你哪些维度真的预测了你的账号的传播。
+**Why equal weights**: you have no data supporting any particular weight. Equal weights let you give each dimension "neutral attention" before the data arrives. After the 5th piece your retro data will tell you which dimensions actually predict spread on your account.
 
-> **通用 rubric 特别提醒**：等权公式对你的内容形式几乎一定是错的——**但这正是 cold-start 的意义**。跑 5 篇之后你会知道哪些维度对你的形式根本不适用（可以在 bump 时去掉或替换）。
-
----
-
-## 7 个维度（**通用定义，请根据你的内容形式自行微调理解**）
-
-### ER — Emotional Resonance（情感共鸣）
-*你的内容能否让受众产生一种**具体的、能命名的**情感？*
-
-- **0** — 纯信息传递；没有情感钩子
-- **3** — 一般共鸣
-- **5** — 锐利、具体、让人不太愿意承认的自我识别
-
-### HP — Hook Potential（钩子强度）
-*开头能不能逼受众继续消费下去？*
-
-- **0** — 通用开场
-- **3** — 具体的承诺或反直觉断言
-- **5** — 一个具体生动的场景 / 画面 / 问题，受众无法停止处理
-
-### QL — Quotable Lines（可传播密度）
-*内容里至少有 2-3 个元素能被截取、能作为独立片段单独传播吗？*
-
-- **0** — 全是叙述 / 流水内容
-- **3** — 有一个值得传播的片段
-- **5** — 多个独立可传播的片段，分布在内容不同位置
-
-### NA — Narrativity（叙事性 / 结构弧线）
-*有可辨识的弧线，还是平铺直叙？*
-
-- **0** — 无结构 / 列表式
-- **3** — 松散主线
-- **5** — 紧凑弧线结构
-
-### AB — Audience Breadth（受众广度）
-*这个议题 / 话题潜在受众有多广？*
-
-- **0** — 极小众
-- **3** — 中等
-- **5** — 普世
-
-### SR — Social Resonance（社会议题共振）
-*内容触及当下的社会模式吗？*
-
-- **0** — 纯个人 / 纯技术
-- **3** — 触到公认现象但没新视角
-- **5** — 命名了一个受众认识但没有语言形容的结构性模式
-
-### SAT — Satire Depth（讽刺 / 风格深度）
-*内容在语调和形式层面有多少"装置感"？*
-
-- **0** — 真诚直陈
-- **3** — 一层反讽 / 有意的风格选择
-- **5** — 嵌套反讽 / 戏仿 / 自指
-
-如果 SAT 不适用于你的内容形式，给 2-3 当占位，bump 时考虑替换为更相关的维度。
+> **Special note for the generic rubric**: the equal-weight formula is almost certainly wrong for your content form — **but that is exactly the point of cold-start**. After 5 pieces you will know which dimensions simply do not apply to your form (you can drop or replace them at bump time).
 
 ---
 
-## Bucket 预测：比率桶方案
+## The 7 dimensions (**generic definitions; adjust your understanding to fit your content form**)
 
-> ⚠️ **新人的 bucket 不能用绝对数字**——不同平台、不同内容形式的基线差异极大。
+### ER — Emotional Resonance
+*Can your content make the audience feel a **concrete, nameable** emotion?*
 
-### 第 1 篇：平台通用默认
+- **0** — Pure information transfer; no emotional hook
+- **3** — Ordinary resonance
+- **5** — Sharp, specific self-recognition that people are reluctant to admit
 
-由于内容形式未知，使用最保守的通用先验：
+### HP — Hook Potential
+*Can the opening force the audience to keep consuming?*
 
-| Bucket | 范围（核心指标数）| 先验概率 |
+- **0** — Generic opening
+- **3** — A concrete promise or counterintuitive assertion
+- **5** — A concrete, vivid scene / image / question the audience cannot stop processing
+
+### QL — Quotable Lines (spread density)
+*Does the content contain at least 2-3 elements that can be clipped and spread as standalone fragments?*
+
+- **0** — All narration / stream-of-consciousness content
+- **3** — One fragment worth spreading
+- **5** — Multiple independently spreadable fragments, distributed across different parts of the content
+
+### NA — Narrativity (structure arc)
+*Is there a recognizable arc, or flat exposition?*
+
+- **0** — No structure / list-like
+- **3** — A loose throughline
+- **5** — A tight arc structure
+
+### AB — Audience Breadth
+*How broad is the potential audience for this issue / topic?*
+
+- **0** — Very niche
+- **3** — Medium
+- **5** — Universal
+
+### SR — Social Resonance
+*Does the content touch a current social pattern?*
+
+- **0** — Purely personal / purely technical
+- **3** — Touches a recognized phenomenon but adds no new perspective
+- **5** — Names a structural pattern the audience recognizes but has no language for
+
+### SAT — Satire Depth (irony / style depth)
+*How much "device" is there at the tone and form level?*
+
+- **0** — Sincere direct statement
+- **3** — One layer of irony / a deliberate style choice
+- **5** — Nested irony / parody / self-reference
+
+If SAT does not apply to your content form, give 2-3 as a placeholder and consider replacing it with a more relevant dimension at bump time.
+
+---
+
+## Bucket prediction: ratio bucket scheme
+
+> ⚠️ **A newcomer's buckets cannot use absolute numbers** — baselines differ enormously across platforms and content forms.
+
+### Piece 1: platform-generic defaults
+
+Since the content form is unknown, use the most conservative generic prior:
+
+| Bucket | Range (core metric count) | Prior probability |
 |---|---|---|
-| 底部 | < 平台新号 P25 | 30% |
-| 基础盘 | P25 - P50 | 40% |
-| 命中 | P50 - P90 | 20% |
-| 小爆 | P90 - P99 | 8% |
-| 大爆 | > P99 | 2% |
+| Floor | < platform new-account P25 | 30% |
+| Base | P25 - P50 | 40% |
+| Hit | P50 - P90 | 20% |
+| Small hit | P90 - P99 | 8% |
+| Big hit | > P99 | 2% |
 
-> "核心指标"取决于平台：播放、阅读、互动、下载、收藏……**第 1 篇时先确定你用哪个指标**。
+> The "core metric" depends on the platform: plays, reads, interactions, downloads, saves... **decide which metric you use at piece 1**.
 
-### 第 2 篇起：用比率桶
+### From piece 2 on: use ratio buckets
 
-`baseline = 上一篇实际核心指标`（或最近 3 篇中位数）。
+`baseline = the previous piece's actual core metric` (or the median of the last 3).
 
-| Bucket | 倍数范围 | 含义 |
+| Bucket | Multiple range | Meaning |
 |---|---|---|
-| 退步 | < 0.3 × baseline | 明显下滑 |
-| 持平 | 0.3 - 1 × baseline | 同档 |
-| 命中 | 1 - 3 × baseline | 中度突破 |
-| 小爆 | 3 - 10 × baseline | 显著破圈 |
-| 大爆 | > 10 × baseline | 量级跃迁 |
+| Regression | < 0.3 × baseline | Clear decline |
+| Flat | 0.3 - 1 × baseline | Same tier |
+| Hit | 1 - 3 × baseline | Moderate breakthrough |
+| Small hit | 3 - 10 × baseline | Significant breakout |
+| Big hit | > 10 × baseline | Order-of-magnitude leap |
 
-第 5 篇后跑 `/cheat-bump --bucket-only` 重新校准边界。
+After the 5th piece, run `/cheat-bump --bucket-only` to recalibrate the boundaries.
 
 ---
 
-## Cold-start 战略（简版）
+## Cold-start strategy (short version)
 
-前 5 篇的"预测"不是预测——是**数据采集**。
+The "predictions" for the first 5 pieces are not predictions — they are **data collection**.
 
-1. **建立纪律**：发布前写下盲判断
-2. **记录 7 维评分**：复盘后每条样本变成 (打分, 实绩) 配对
-3. **取样策略**：主动选维度组合差异最大的内容——确保 5 个样本覆盖不同的维度组合
+1. **Build discipline**: write a blind judgment before publishing
+2. **Record 7-dimension scores**: after the retro each sample becomes a (score, actual) pair
+3. **Sampling strategy**: actively pick content with the most divergent dimension combinations — make sure the 5 samples cover different dimension combinations
 
-> **通用 rubric 额外建议**：前 5 篇复盘时，除了记录数据，还要记录"这个维度对我的内容形式到底意味着什么"。Bump 时你可能需要**重新定义维度**而不只是调权重。
+> **Extra advice for the generic rubric**: during the first 5 retros, besides recording the data, also record "what this dimension actually means for my content form". At bump time you may need to **redefine the dimensions**, not just tune the weights.
 
-| 校准样本 | 你能相信什么 |
+| Calibration samples | What you can trust |
 |---|---|
-| N=0-2 | 啥都别信 |
-| N=3-5 | 相信"哪个维度可能重要"的方向 |
-| N=5-10 | 相信 bucket 排序 |
-| N=10-20 | 中枢可信 ±30% |
-| N≥20 | rubric 真正成为"作弊器" |
+| N=0-2 | Nothing |
+| N=3-5 | Trust the direction of "which dimension may matter" |
+| N=5-10 | Trust bucket ordering |
+| N=10-20 | The center is trustworthy to ±30% |
+| N≥20 | The rubric truly becomes a "cheat code" |
 
 ---
 
-## 重要警告
+## Important warnings
 
-- **这是通用 rubric**——维度定义可能与你的内容形式严重不匹配。**用它收集数据，不要用它做决策**
-- cold-start 期 composite 的置信度低——**不要基于 v0 分数决定要不要发某篇内容**
-- 前 5 篇**每篇必须走完整闭环**（predict → 发布 → retro），跳过任何一篇复盘 = 整个校准失败
-- 第 5 篇后**必须**跑 `/cheat-bump` 升级——**通用 rubric 尤其需要 bump**，因为维度本身可能需要替换
+- **This is a generic rubric** — the dimension definitions may seriously mismatch your content form. **Use it to collect data, not to make decisions**
+- Cold-start composites have low confidence — **do not decide whether to publish a piece based on a v0 score**
+- The first 5 pieces **must each complete the full loop** (predict → publish → retro); skipping any retro = the whole calibration fails
+- After the 5th piece you **must** run `/cheat-bump` to upgrade — **the generic rubric especially needs a bump**, because the dimensions themselves may need replacing
 
 ---
 
-## 最重要的一句话
+## The most important sentence
 
-**前 5 篇你不是在做决策，你是在收集数据。** 通用 rubric 的价值不在于它的维度定义有多准——在于它强迫你建立预测-复盘的闭环习惯。第 5 篇 bump 时，大胆重新定义维度。
+**For the first 5 pieces you are not making decisions; you are collecting data.** The value of the generic rubric is not how accurate its dimension definitions are — it is that it forces you to build the predict-retro loop habit. At the 5th-piece bump, be bold about redefining the dimensions.

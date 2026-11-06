@@ -1,11 +1,11 @@
-"""发完帖子后跑一次：抓 LinkedIn 单帖分析 → 生成 NotebookLM 友好的 md。
+"""Run once after publishing a post: fetch LinkedIn single-post analytics -> generate NotebookLM-friendly md.
 
-用法：
-    python review.py login                              # 仅登录（首次，弹出浏览器）
-    python review.py video <activity_id_or_url> [script.txt]   # 抓单帖分析
+Usage:
+    python review.py login                              # login only (first time, opens a browser)
+    python review.py video <activity_id_or_url> [script.txt]   # fetch single-post analytics
 
-`video` 子命令名沿用 douyin-session / bilibili-stat 的契约（/cheat-retro 统一调
-`run.sh ... video ...`）；对 LinkedIn 而言"video"即一条帖子。
+The `video` subcommand name follows the douyin-session / bilibili-stat contract (/cheat-retro
+uniformly calls `run.sh ... video ...`); for LinkedIn, "video" means one post.
 """
 from __future__ import annotations
 
@@ -29,15 +29,15 @@ def run_with_id(activity_raw: str, script_path: str | None) -> None:
         p = Path(script_path).expanduser()
         if p.is_file():
             script = p.read_text(encoding="utf-8", errors="ignore")
-            print(f"稿子：{p.name}（{len(script)} 字符）")
+            print(f"Script: {p.name} ({len(script)} characters)")
         else:
-            print(f"[警告] 找不到稿子 {p}")
+            print(f"[warning] Cannot find script {p}")
 
-    print(f"[抓取] 帖子 activity:{activity_id}")
+    print(f"[fetch] Post activity:{activity_id}")
     result = asyncio.run(crawler.fetch_all(activity_id))
     post = result["post"]
     if not post:
-        print("❌ 未抓到数据（多半是未登录）。先跑：python review.py login")
+        print("❌ No data fetched (most likely not logged in). Run first: python review.py login")
         sys.exit(3)
 
     out_dir = renderer.output_dir_for(post, active_videos_dir)
@@ -56,7 +56,7 @@ def main() -> None:
         return
     if len(sys.argv) > 1 and sys.argv[1] == "video":
         if len(sys.argv) < 3:
-            print("用法：python review.py video <activity_id_or_url> [script.txt]")
+            print("Usage: python review.py video <activity_id_or_url> [script.txt]")
             sys.exit(3)
         activity_raw = sys.argv[2]
         script_path = sys.argv[3] if len(sys.argv) > 3 else None

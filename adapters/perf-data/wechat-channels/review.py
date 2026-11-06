@@ -49,7 +49,7 @@ def main() -> None:
             title = (post.get("title") or "").replace("\n", " ")[:50]
             print(
                 f"[{i}] {post['post_id']}  {renderer._fmt_time(post.get('create_time'))}  "
-                f"播放{renderer._fmt_num(post.get('view_count'))}  {title}"
+                f"plays {renderer._fmt_num(post.get('view_count'))}  {title}"
             )
     elif command == "capture-comments":
         async def _capture() -> None:
@@ -72,5 +72,5 @@ if __name__ == "__main__":
     try:
         main()
     except LookupError as exc:
-        print(f"[错误] {exc}", file=sys.stderr)
+        print(f"[error] {exc}", file=sys.stderr)
         raise SystemExit(3) from exc

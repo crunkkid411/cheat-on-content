@@ -1,366 +1,366 @@
 ---
 name: cheat-predict
-description: 给最终稿写一份 immutable 盲预测日志。这是 cheat-on-content 整个校准循环的核心动作——预测段一旦写完不可改，由 hook 强制。**自动检测**：如目标文件已有 `## 预测` / `## 预测 v1` 段（被 cheat-shoot 调用走 v2 模式），改成 append `## 预测 v2` 而非覆盖。**打分通过 Task tool 委派给 `cheat-score-blind` sub-agent**（context-isolated channel B），主 Claude review 后落盘。触发词："启动预测"/"start prediction"/"给这稿子打分并预测"/"写预测日志"。
+description: Write an immutable blind-prediction log for the final draft. This is the core action of the entire cheat-on-content calibration loop — once the prediction section is written it cannot be changed, enforced by the hook. **Auto-detection**: if the target file already has a `## Prediction` / `## Prediction v1` section (called by cheat-shoot in v2 mode), append `## Prediction v2` instead of overwriting. **Scoring is delegated to the `cheat-score-blind` sub-agent via the Task tool** (context-isolated channel B); the main Claude reviews and then persists. Triggers: "启动预测" / "start prediction" / "给这稿子打分并预测" / "写预测日志".
 argument-hint: <script-path> [— mode: v1|v2] [— prediction-file: <path>] [— skip-blind]
 allowed-tools: Bash(*), Read, Write, Edit, Glob, Task
 ---
 
-# /cheat-predict — AI 主导的盲预测 + 用户 review
+# /cheat-predict — AI-led blind prediction + user review
 
-**这个工具是"作弊器"——AI 帮你做判断**。所以 cheat-predict 的核心是：
-- **Claude 自己**读稿子 + 打 7 维分 + 给 bucket + 概率分布 + 反事实场景
-- 用户 **review** 后回 "ok" 接受，或指出哪个维度 / 哪个判断不对
-- 默认走快路径：用户直接 ok → 落盘
-- 慢路径：用户挑刺某个维度 → Claude 改 → 再 review → 直至确认
+**This tool is a "cheat device" — the AI makes the judgment for you**. So the core of cheat-predict is:
+- **Claude itself** reads the draft + scores the 7 dimensions + gives the bucket + probability distribution + counterfactual scenarios
+- The user **reviews** and replies "ok" to accept, or points out which dimension / judgment is wrong
+- Default fast path: user says ok → persist
+- Slow path: user challenges a dimension → Claude revises → review again → until confirmed
 
-不是用户从 7 维分到概率分布全部自己写，那 Claude 只剩"格式化器"——失去工具的核心价值。
+It is not the user writing everything from the 7 dimension scores to the probability distribution — that would leave Claude as only a "formatter", losing the tool's core value.
 
-**严格遵守 [shared-references/blind-prediction-protocol.md](../../shared-references/blind-prediction-protocol.md)**——见过任何后续数据就不能写预测，只能记 reconstructed。
-完整组件清单见 [shared-references/prediction-anatomy.md](../../shared-references/prediction-anatomy.md)。
-Confidence 派生表见 [shared-references/state-management.md](../../shared-references/state-management.md)。
+**Strictly follow [shared-references/blind-prediction-protocol.md](../../shared-references/blind-prediction-protocol.md)** — if you have seen any subsequent data you cannot write a prediction, only a reconstructed one.
+Full component checklist: [shared-references/prediction-anatomy.md](../../shared-references/prediction-anatomy.md).
+Confidence derivation table: [shared-references/state-management.md](../../shared-references/state-management.md).
 
 ## Overview
 
 ```
-[用户：启动预测 scripts/<id>.md]
+[User: start prediction scripts/<id>.md]
   ↓
-[Phase 0: blind check 自检]                    ← 触犯就拒绝
+[Phase 0: blind check self-audit]                    ← refuse if violated
   ↓
-[Phase 0.7: 模式判定 — v1 (新建) 还是 v2 (append)]
+[Phase 0.7: mode decision — v1 (new) or v2 (append)]
   ↓
-[Phase 1: 读 script + rubric + state + 派生 confidence]
+[Phase 1: read script + rubric + state + derive confidence]
   ↓
-[Phase 2: **委派 cheat-score-blind sub-agent**（Task tool）拿 9 维盲打 + per-dim confidence]
+[Phase 2: **delegate to the cheat-score-blind sub-agent** (Task tool) for N-dimensional blind scoring + per-dim confidence]
   ↓
-[Phase 2.5: 主 Claude 对 blind 输出做 review — 若任意维度 |delta| ≥ 2 vs 主估，弹给用户裁定]
+[Phase 2.5: main Claude reviews the blind output — if any dimension |delta| ≥ 2 vs the self-estimate, ask the user to arbitrate]
   ↓
-[Phase 3: **Claude 自己**找锚点对比]
+[Phase 3: **Claude itself** finds anchors and compares]
   ↓
-[Phase 4: **Claude 自己**给 bucket + 概率分布 + 中枢]   ← confidence 低时分布更平
+[Phase 4: **Claude itself** gives bucket + probability distribution + center]   ← flatter distribution when confidence is low
   ↓
-[Phase 5: **Claude 自己**写反事实场景 + 关键校准假设]
+[Phase 5: **Claude itself** writes counterfactual scenarios + critical calibration hypothesis]
   ↓
-[Phase 5.5: **用户 review**——展示完整草拟版，等用户 "ok" 或挑刺]
+[Phase 5.5: **user review** — show the complete draft, wait for "ok" or challenges]
   ↓
-   ├─ "ok" → Phase 6 落盘
-   └─ "X 维度应该 Y 不是 Z" → Claude 改 → 再 review → 循环
+   ├─ "ok" → Phase 6 persist
+   └─ "dimension X should be Y not Z" → Claude revises → review again → loop
   ↓
-[Phase 6: 落盘 — v1 写新文件 / v2 append 到现有文件 ## 复盘 之前]
+[Phase 6: persist — v1 writes a new file / v2 appends before the existing ## Retrospective]
   ↓
-[Phase 7: 更新 state.in_progress_session]
+[Phase 7: update state.in_progress_session]
 ```
 
 ## Constants
 
-- **SCRIPTS_DIR = scripts/** — 草稿源目录
-- **PREDICTION_DIR = predictions/** — 落盘目录
-- **BLIND_CHECK = strict** — strict（默认）/ lenient（仅警告，不推荐）—— 跟 [blind-prediction-protocol.md](../../shared-references/blind-prediction-protocol.md) "见过数据"边界相关
-- **BLIND_SCORING = on**（默认）/ off —— 是否走 [cheat-score-blind](../cheat-score-blind/SKILL.md) sub-agent。off 等价于 `--skip-blind` flag，标 `last_prediction_self_scored: true` 给 cheat-status 警告
-- **DISAGREEMENT_THRESHOLD = 2** —— blind 与主 Claude 自评的单维度差异 |Δ| ≥ 此值 → Phase 2.5 弹用户裁定
-- **BUCKET_PRESET = auto** — 自动派生：有 baseline_plays → 按 baseline × {0.3 / 1 / 3 / 10 / 30}；无 baseline → 平台通用默认
-- **MIN_ANCHORS = 2** — 锚点对比期望 2 个；不够时显式标"锚点 N/A"段（不删段，不省略）
+- **SCRIPTS_DIR = scripts/** — draft source directory
+- **PREDICTION_DIR = predictions/** — persist directory
+- **BLIND_CHECK = strict** — strict (default) / lenient (warn only, not recommended) — relates to the "have seen data" boundary in [blind-prediction-protocol.md](../../shared-references/blind-prediction-protocol.md)
+- **BLIND_SCORING = on** (default) / off — whether to use the [cheat-score-blind](../cheat-score-blind/SKILL.md) sub-agent. off is equivalent to the `--skip-blind` flag, marking `last_prediction_self_scored: true` to trigger a cheat-status warning
+- **DISAGREEMENT_THRESHOLD = 2** — single-dimension difference between blind and the main Claude's self-estimate |Δ| ≥ this value → Phase 2.5 asks the user to arbitrate
+- **BUCKET_PRESET = auto** — derived automatically: with baseline_plays → baseline × {0.3 / 1 / 3 / 10 / 30}; without baseline → platform-generic defaults
+- **MIN_ANCHORS = 2** — anchor comparison expects 2; when there are not enough, explicitly write an "anchors N/A" section (do not delete the section, do not omit it)
 
-> 💡 调用时覆盖：`/cheat-predict scripts/<id>.md — BLIND_CHECK: lenient` / `--skip-blind`（都不推荐）
+> 💡 Override at call time: `/cheat-predict scripts/<id>.md — BLIND_CHECK: lenient` / `--skip-blind` (both not recommended)
 
 ## Inputs
 
-| 必填 | 来源 |
+| Required | Source |
 |---|---|
-| `<video-folder-path>` 或 `<script-path>` | 用户参数；缺失则询问 |
-| `rubric_notes.md` | 用户项目根 |
-| `.cheat-state.json` | 状态文件 |
-| `predictions/*.md`（可选） | 历史预测，作为锚点 |
+| `<video-folder-path>` or `<script-path>` | user argument; ask if missing |
+| `rubric_notes.md` | user project root |
+| `.cheat-state.json` | state file |
+| `predictions/*.md` (optional) | historical predictions, used as anchors |
 
-### 入参解析（Phase 0.5，在 blind check 之前）
+### Argument parsing (Phase 0.5, before blind check)
 
-用户给的路径**应该是** `scripts/<date>_<id>_<short>.md`。如不在 scripts/ 下：
+The path the user gives **should** be `scripts/<date>_<id>_<short>.md`. If it is not under scripts/:
 
-| 形态 | 处理 |
+| Form | Handling |
 |---|---|
-| `scripts/<date>_<id>_<short>.md` | 标准路径，直接用 |
-| `<id>` 或 `<short>` 简写 | glob `scripts/*_<id>_*.md` 或 `scripts/*<short>*.md` 找匹配 |
-| 任意外部 .md 文件（如 `~/Desktop/my-draft.md`） | **警告 + 询问**："建议把稿子放到 scripts/<date>_<id>_<short>.md 让 cheat-on-content 管理。要我帮你 cp 过去并算 id 吗？"用户同意 → 建标准路径再继续 |
-| `videos/<id>/` 路径（user 误以为视频文件夹存稿子）| 提示"video folder 是拍后才建的——pre-shoot 草稿在 scripts/。你要 predict 哪份稿子？" |
+| `scripts/<date>_<id>_<short>.md` | standard path, use directly |
+| `<id>` or `<short>` shorthand | glob `scripts/*_<id>_*.md` or `scripts/*<short>*.md` to find matches |
+| Any external .md file (e.g. `~/Desktop/my-draft.md`) | **warn + ask**: "It is recommended to put the draft at scripts/<date>_<id>_<short>.md so cheat-on-content can manage it. Want me to cp it over and compute the id?" If the user agrees → build the standard path and continue |
+| `videos/<id>/` path (the user mistakenly thinks the video folder holds the script) | say "the video folder is created only after shooting — pre-shoot drafts live in scripts/. Which draft do you want to predict?" |
 
-如 scripts/<id>.md 不存在 → 报错并询问"你想 predict 的稿子在哪？"
+If scripts/<id>.md does not exist → error and ask "where is the draft you want to predict?"
 
 ## Workflow
 
-### Phase 0: Blind check 自检（**最关键**，触犯立即终止）
+### Phase 0: Blind check self-audit (**most critical**; stop immediately if violated)
 
-按 [blind-prediction-protocol.md](../../shared-references/blind-prediction-protocol.md) 的"子 skill 必须做的检查清单"执行：
+Follow the "checklist every sub-skill must run" in [blind-prediction-protocol.md](../../shared-references/blind-prediction-protocol.md):
 
-1. 询问用户该作品当前发布状态：
-   - 未发 → 通过
-   - 已发 < `RETRO_WINDOW_DAYS` 天 → 询问"你看过任何后续数据吗（播放/点赞/评论）？"
-     - 用户回答"没看过" → 通过，标记 `published_before_prediction: true` + `blind_status: confirmed_no_data_seen`
-     - 用户回答含糊 → 视为"已看"，按下一项处理
-   - 已发 ≥ `RETRO_WINDOW_DAYS` 天 → **立即拒绝写"预测"**，建议改用 `_redo.md` 路径记 reconstructed retrospective
+1. Ask the user for the piece's current publishing status:
+   - Not published → pass
+   - Published < `RETRO_WINDOW_DAYS` days ago → ask "have you seen any subsequent data (plays / likes / comments)?"
+     - User answers "no" → pass, mark `published_before_prediction: true` + `blind_status: confirmed_no_data_seen`
+     - User answers vaguely → treat as "seen", handle under the next item
+   - Published ≥ `RETRO_WINDOW_DAYS` days ago → **immediately refuse to write a "prediction"**; recommend the `_redo.md` path to record a reconstructed retrospective
 
-2. 自检对话历史里是否含播放/阅读/点赞/评论/转发等字眼的实际数字 → 命中则视为已见数据，按上面 strict 模式处理
+2. Self-audit the conversation history for actual numbers alongside words such as plays / reads / likes / comments / shares → if found, treat as having seen data and handle under strict mode above
 
-3. `BLIND_CHECK=lenient` 模式：仅警告 + 强制在文件头标注 `**Reconstructed retrospective — NOT a blind prediction**`，但仍允许继续
+3. `BLIND_CHECK=lenient` mode: warn only + force-mark the file header `**Reconstructed retrospective — NOT a blind prediction**`, but still allow continuing
 
-通过 → 进入 Phase 0.7。
+Pass → go to Phase 0.7.
 
-### Phase 0.7: 模式判定（v1 vs v2）
+### Phase 0.7: Mode decision (v1 vs v2)
 
-判定本次是新建预测（v1）还是对既有预测的 v2 追加（拍后改稿场景）。
+Decide whether this is a new prediction (v1) or a v2 append to an existing prediction (the post-shoot script-revision scenario).
 
-**显式参数优先**：用户/调用方传 `— mode: v2` + `— prediction-file: <path>` → 直接 v2 模式。
+**Explicit parameters take priority**: the user/caller passes `— mode: v2` + `— prediction-file: <path>` → go directly to v2 mode.
 
-**自动检测**（无显式参数）：
-1. 推断目标 prediction 路径：`predictions/<同 scripts/<id> 命名>.md`
-2. 读该路径：
-   - 不存在 → **v1 模式**，进入 Phase 1
-   - 存在但只有空 `## 复盘`（无任何 `## 预测...` 段）→ **v1 模式**（异常状态，覆盖警告 + 进 Phase 1）
-   - 存在且含 `## 预测` 或 `## 预测 v1` 段 → **v2 模式**
+**Auto-detection** (no explicit parameters):
+1. Infer the target prediction path: `predictions/<same naming as scripts/<id>>.md`
+2. Read that path:
+   - Does not exist → **v1 mode**, go to Phase 1
+   - Exists but only an empty `## Retrospective` (no `## Prediction...` section) → **v1 mode** (abnormal state; warn about overwrite + go to Phase 1)
+   - Exists and contains `## Prediction` or `## Prediction v1` → **v2 mode**
 
-**v2 模式额外动作**：
-- 比较输入 script（最终拍摄稿）与 `## 预测` 段引用的原 `Script Hash`
-- 如完全一致（hash 同）→ 警告"稿子没改，是否真要写 v2？"——用户确认才继续；不确认则退出
-- 如不同 → 算 diff 概要（行数 / 字数 / 结构变化）→ Phase 5.5 review 时展示给用户
-- 标记 `prediction_basis = "post_shoot_pre_publish"`（v1 默认 `pre_shoot`）
+**Extra actions in v2 mode**:
+- Compare the input script (the final shooting draft) with the original `Script Hash` referenced in the `## Prediction` section
+- If completely identical (same hash) → warn "the draft did not change; do you really want a v2?" — continue only after user confirmation; otherwise exit
+- If different → compute a diff summary (lines / words / structural changes) → show it to the user during the Phase 5.5 review
+- Mark `prediction_basis = "post_shoot_pre_publish"` (v1 defaults to `pre_shoot`)
 
-### Phase 1: 读最终稿 + rubric + state + 派生 confidence
+### Phase 1: Read the final draft + rubric + state + derive confidence
 
-1. 按 Phase 0.5 解析后的路径，读 `scripts/<id>.md` 全文
-2. 计算 `script_hash` = sha256(script 内容)[:12] → header 用
-3. 读 `rubric_notes.md`，识别当前公式 + 维度（同 cheat-score Phase 2）
-4. 读 `.cheat-state.json` 拿 `rubric_version`、`content_form`、`calibration_samples`、`typical_duration_seconds`、`baseline_plays`
-5. **从 `calibration_samples` 派生 confidence 等级**（按 [state-management.md confidence 表](../../shared-references/state-management.md)）→ 后续写入 prediction header
-6. 询问用户："这是你打算实际拍摄发布的最终稿吗？还是会再改？"——必须是最终稿
-7. 如果稿子字数与 `typical_duration_seconds` 派生范围严重不符（差 >50%）→ 提示用户："这条稿子 N 字，按你设的典型时长（X 分钟）应该是 M-K 字。是临时改了时长，还是稿子需要砍/补？"
+1. Read the full text of `scripts/<id>.md` at the path resolved in Phase 0.5
+2. Compute `script_hash` = sha256(script content)[:12] → for the header
+3. Read `rubric_notes.md`, identify the current formula + dimensions (same as cheat-score Phase 2)
+4. Read `.cheat-state.json` for `rubric_version`, `content_form`, `calibration_samples`, `typical_duration_seconds`, `baseline_plays`
+5. **Derive the confidence level from `calibration_samples`** (per the [state-management.md confidence table](../../shared-references/state-management.md)) → write it into the prediction header later
+6. Ask the user: "Is this the final draft you plan to actually shoot and publish, or will you revise it again?" — it must be the final draft
+7. If the draft's word count badly mismatches the range derived from `typical_duration_seconds` (>50% off) → tell the user: "This draft is N words; given your typical duration (X minutes) it should be M-K words. Did you intentionally change the duration, or does the draft need cutting / padding?"
 
-### Phase 2: 委派 cheat-score-blind sub-agent 拿盲打分
+### Phase 2: Delegate to the cheat-score-blind sub-agent for blind scoring
 
-**BLIND_SCORING=on**（默认）—— 主 Claude 不再 inline 打分。通过 Task tool spawn `cheat-score-blind`，让一个 context-isolated 的 sub-agent 只看 script + rubric_notes.md 给出 N 维分。
+**BLIND_SCORING=on** (default) — the main Claude no longer scores inline. Spawn `cheat-score-blind` via the Task tool so a context-isolated sub-agent sees only the script + rubric_notes.md and returns N-dimensional scores.
 
-详见 [cheat-score-blind/SKILL.md](../cheat-score-blind/SKILL.md) 的"主 Claude 调用契约"段。**Task prompt 必须精简**：
+See the "main Claude call contract" section of [cheat-score-blind/SKILL.md](../cheat-score-blind/SKILL.md). **The task prompt must be minimal**:
 
 ```
 Spawn cheat-score-blind sub-agent.
 
 Input:
-  script_path: <Phase 0.5 解析出的 scripts/<id>.md>
+  script_path: <the scripts/<id>.md resolved in Phase 0.5>
   rubric_notes_path: rubric_notes.md
 
-Task: 按 rubric_notes 当前公式给上面 script 打分。返回严格 JSON（见 cheat-score-blind SKILL.md Phase 2 schema）。
-不要读 state file / predictions/ / videos/ 任何其他文件。
-不要询问用户 —— 你没有用户。
+Task: score the above script according to the current formula in rubric_notes. Return strict JSON (see the cheat-score-blind SKILL.md Phase 2 schema).
+Do not read the state file / predictions/ / videos/ or any other file.
+Do not ask the user anything — you have no user.
 ```
 
-**调用前自检**：把 Task prompt 串过 `grep -Ei '播放|阅读|点赞|评论数|实际|retro|复盘|实绩|w$|万$'`——命中 → 改 prompt 重发。
+**Self-audit before calling**: grep the task prompt with `grep -Ei '播放|阅读|点赞|评论数|实际|retro|复盘|实绩|w$|万$'` — if it hits, rewrite the prompt and resend.
 
-**主 Claude 自己也内心估一份**（不发 sub-agent）——纯为 Phase 2.5 disagreement 检测，**不落盘**、**不替代 sub-agent 输出**。这个估值代表"如果我没用 sub-agent，我会打多少"，是 contamination 的客观指标。
+**The main Claude also makes its own internal estimate** (not sent to the sub-agent) — purely for Phase 2.5 disagreement detection; **not persisted**, **does not replace the sub-agent output**. This estimate represents "what I would have scored without the sub-agent" and is an objective measure of contamination.
 
-**沙盒 escape**：`BLIND_SCORING=off` 或 `--skip-blind` —— 主 Claude 自己打 7 维。state 立刻标 `last_prediction_self_scored: true` + `last_self_scored_at: <ISO>`，cheat-status 持续提示警告。仅用于：
-- Task tool 不可用（开发环境 / 离线）
-- 用户主动 audit 主 Claude 的 inline 判分能力（极少数）
+**Sandbox escape**: `BLIND_SCORING=off` or `--skip-blind` — the main Claude scores the 7 dimensions itself. State immediately marks `last_prediction_self_scored: true` + `last_self_scored_at: <ISO>`, and cheat-status keeps warning. Only for:
+- Task tool unavailable (dev environment / offline)
+- The user actively wants to audit the main Claude's inline scoring ability (very rare)
 
-按当前公式算 composite——**用 sub-agent 回传的 dim 分**，不用主 Claude 自估。
+Compute the composite with the current formula — **using the dimension scores returned by the sub-agent**, not the main Claude's self-estimate.
 
-### Phase 2.5: Blind 输出 review + disagreement detection
+### Phase 2.5: Blind output review + disagreement detection
 
-拿到 sub-agent JSON 后，主 Claude 必做的事：
+After receiving the sub-agent JSON, the main Claude must:
 
-1. **JSON validity check**：`python3 -c "import json; json.loads(...)"` 应能解析；不能解析 → 主 Claude 重发 Task（最多 3 次重试），仍败 → abort，向用户报告
-2. **Contamination check**：`self_check.any_contamination_signal == true` → 警告用户"sub-agent 自报疑似 contamination"，但仍接受打分（confidence 降一档）
-3. **Refusal check**：`refusal != null` → 按 [cheat-score-blind/SKILL.md](../cheat-score-blind/SKILL.md) Phase 2 的处理表对应路径
-4. **Disagreement detection**（核心）：
-   - 主 Claude 内心估一份 N 维分（Phase 2 末尾的"自估"）
-   - 对每个维度算 `delta = |主估 - blind|`
-   - 任何维度 `delta >= DISAGREEMENT_THRESHOLD`（默认 2） → **弹给用户裁定**
+1. **JSON validity check**: `python3 -c "import json; json.loads(...)"` should parse it; if not → resend the Task (up to 3 retries); still failing → abort and report to the user
+2. **Contamination check**: `self_check.any_contamination_signal == true` → warn the user "the sub-agent self-reports possible contamination", but still accept the score (drop confidence one level)
+3. **Refusal check**: `refusal != null` → follow the corresponding path in the handling table in [cheat-score-blind/SKILL.md](../cheat-score-blind/SKILL.md) Phase 2
+4. **Disagreement detection** (core):
+   - The main Claude internally estimates N dimension scores (the "self-estimate" at the end of Phase 2)
+   - Compute `delta = |self-estimate - blind|` for every dimension
+   - Any dimension with `delta >= DISAGREEMENT_THRESHOLD` (default 2) → **ask the user to arbitrate**
 
-弹裁定 UX：
+Arbitration UX:
 
 ```
-⚠️  blind sub-agent 跟主 Claude 在某些维度差异较大：
+⚠️  The blind sub-agent differs significantly from the main Claude on some dimensions:
 
-| 维度 | blind (sub) | 主 Claude 自估 | delta | sub-agent 理由 |
+| Dimension | blind (sub) | Main Claude self-estimate | delta | Sub-agent reason |
 |---|---|---|---|---|
-| ER | 5 | 3 | 2 | "PPT加油猫猫开头—具象画面强" |
-| AB | 2 | 4 | 2 | "一人公司视角，受众窄" |
+| ER | 5 | 3 | 2 | "PPT cheering-cat opening — concrete, strong visual" |
+| AB | 2 | 4 | 2 | "one-person-company angle, narrow audience" |
 
-谁更准？
-  a) 信 sub-agent（隔离打分，但同 Claude 模型）
-  b) 信主 Claude 自估（有更多对话上下文，可能是 contamination）
-  c) 我自己定（你直接给分）
+Who is more accurate?
+  a) Trust the sub-agent (isolated scoring, but same Claude model)
+  b) Trust the main Claude self-estimate (more conversational context, possibly contaminated)
+  c) I'll decide myself (you give the scores)
 
-回 a / b / c <你的分数>
+Reply a / b / c <your scores>
 ```
 
-用户选：
-- a → 用 sub-agent 全套分进 Phase 3
-- b → 用主 Claude 自估全套分（视为有意接受 contamination）→ 强制标 `last_prediction_self_scored: true`
-- c → 用户给的分覆盖该维度，其他维度仍走 sub-agent → 记到 `User Override`
+User choice:
+- a → use the sub-agent's full score set in Phase 3
+- b → use the main Claude's full self-estimate (treated as deliberately accepting contamination) → force `last_prediction_self_scored: true`
+- c → the user's score overrides that dimension; other dimensions still use the sub-agent → record in `User Override`
 
-**所有 delta** —— 即使全 < THRESHOLD —— 都记录到 prediction header 的 `BlindScore Disagreement` 字段（详见 [prediction-anatomy.md](../../shared-references/prediction-anatomy.md) 组件 1）。delta=0 也要记录。
+**All deltas** — even if all < THRESHOLD — are recorded in the prediction header's `BlindScore Disagreement` field (see [prediction-anatomy.md](../../shared-references/prediction-anatomy.md) component 1). Record delta=0 too.
 
-### Phase 3: 锚点对比
+### Phase 3: Anchor comparison
 
-**所有阶段都跑此 phase**——锚点不够时显式标 N/A，不删段。
+**Run this phase at every stage** — when there are not enough anchors, explicitly mark N/A; do not delete the section.
 
-1. Glob `predictions/*.md`，读每个文件 header（提取 composite、实绩 bucket、duration_seconds）。**注意排除 reconstructed predictions**（标记 "Reconstructed" 的不算锚点）
-2. **优先**找同时长样本（`Target Duration (s)` 与本次差 ±20% 内）
-3. 在同时长（或全部）池里，找 2-4 个 composite 与本次预测 ±0.5 范围内的样本
-4. **如果池子太小**（同时长 < 2 个 + 全部 < 2 个）→ 输出"锚点对比 N/A 段"（参考 [prediction-anatomy.md](../../shared-references/prediction-anatomy.md) 组件 5）—— 仍写这段，告诉读者锚点为何缺
-5. 列对照表；如跨时长，每行额外列"时长 vs 本次"列
-6. **关键诊断**：如果某个锚点的 composite 几乎相同但实绩差异 ≥3x → 说明 rubric 没捕获关键维度。**在文件里明确标注**作为新观察的种子
+1. Glob `predictions/*.md`, read each file's header (extract composite, actual-performance bucket, duration_seconds). **Be careful to exclude reconstructed predictions** (anything marked "Reconstructed" is not an anchor)
+2. **Prefer** samples with the same duration (`Target Duration (s)` within ±20% of this one)
+3. In the same-duration (or all) pool, find 2-4 samples whose composite is within ±0.5 of this prediction
+4. **If the pool is too small** (same duration < 2 + all < 2) → output the "anchor comparison N/A section" (see [prediction-anatomy.md](../../shared-references/prediction-anatomy.md) component 5) — still write this section, telling the reader why anchors are missing
+5. List the comparison table; if crossing durations, add an extra "duration vs this one" column per row
+6. **Critical diagnosis**: if an anchor has almost the same composite but ≥3x difference in actual performance → the rubric is missing a key dimension. **Explicitly flag it in the file** as a seed for a new observation
 
-> 为什么按时长筛锚点：4 分钟视频 5w 播放 vs 1 分钟视频 5w 播放完全不是一回事——长视频每秒扛了更多注意力损失。跨时长锚点容易得出虚假结论。
+> Why filter anchors by duration: 4-minute video at 50k plays vs 1-minute video at 50k plays are completely different things — a long video carries more attention loss per second. Cross-duration anchors easily lead to false conclusions.
 
-### Phase 4: Bucket + 概率分布 + 中枢
+### Phase 4: Bucket + probability distribution + center
 
-**所有阶段都写**——confidence 低时分布**更平**，不是省略。
+**Write it at every stage** — when confidence is low the distribution is **flatter**, not omitted.
 
-1. 从 `starter-rubrics/<content_form>.md` 读默认 bucket 边界（除非用户在 rubric_notes.md 自定义了）
-2. 选择最可能的 bucket（headline call）
-3. **必须**给出所有 bucket 的概率分布——加起来 100%
-4. **必须**给出该 bucket 内的"中枢"点估计
+1. Read the default bucket boundaries from `starter-rubrics/<content_form>.md` (unless the user customized them in rubric_notes.md)
+2. Choose the most likely bucket (headline call)
+3. **Must** give the probability distribution over all buckets — summing to 100%
+4. **Must** give a "center" point estimate inside that bucket
 
-**反诚实陷阱**：如果你给一个 bucket 95% 概率，下次预测错了你没法说"我其实不太确定"。**真实的概率分布通常在 headline bucket 是 40-65%**，剩下 ≥35% 散布在邻近 buckets。
+**Anti-honesty trap**: if you give a bucket 95% probability, then when the next prediction is wrong you cannot say "I wasn't really sure". **A real probability distribution usually puts 40-65% on the headline bucket**, with the remaining ≥35% spread across neighboring buckets.
 
-### Phase 5: 反事实场景 + 关键校准假设
+### Phase 5: Counterfactual scenarios + critical calibration hypothesis
 
-**所有阶段都写**——校准池小时关键校准假设可能没有合适对照样本，那就写"无可对照样本——仍写下我对这次的核心赌注"+ 1-2 条这次想测的事。
+**Write it at every stage** — when the calibration pool is small the critical calibration hypothesis may have no suitable comparison sample; then write "no comparable samples — but I will still write down my core bet for this one" + 1-2 things you want to test this time.
 
-**反事实场景**（4 段，每段对应一个可能的 bucket，写"如果落在这里，意味着什么 rubric 假设被验证 / 推翻"）：参考 [prediction-anatomy.md](../../shared-references/prediction-anatomy.md) 组件 6。
+**Counterfactual scenarios** (4 sections, each corresponding to a possible bucket; write "if it lands here, which rubric hypothesis is validated / refuted"): see [prediction-anatomy.md](../../shared-references/prediction-anatomy.md) component 6.
 
-**关键校准假设**（强烈推荐）：
-- 找一个对照样本（最好是上一篇预测）
-- 明确写"我押本篇 vs 对照 = X 倍"
-- 写"如果反过来 / 差距 < N → 哪个 rubric 假设被推翻"
+**Critical calibration hypothesis** (strongly recommended):
+- Find a comparison sample (preferably the previous prediction)
+- Explicitly write "I bet this piece vs the comparison = X times"
+- Write "if the opposite happens / the gap is < N → which rubric hypothesis is refuted"
 
-如 `REQUIRE_HYPOTHESIS=required` → 缺失则不允许落盘。
+If `REQUIRE_HYPOTHESIS=required` → not allowed to persist without it.
 
-### Phase 5.5: 用户 review（**核心 — 决定写什么进文件**）
+### Phase 5.5: User review (**core — decides what goes into the file**)
 
-Phase 2-5 全部在内存里做完后，**一次性展示完整草拟版**给用户：
+After Phases 2-5 are all done in memory, **show the complete draft to the user in one go**:
 
 ```
-我的预测草稿（写文件前 review）：
+My prediction draft (review before writing the file):
 
-📊 7 维分（v0 / v2 / 等当前 rubric）：
-| 维度 | 分 | 理由 |
+📊 7 dimension scores (v0 / v2 / whatever the current rubric is):
+| Dimension | Score | Reason |
 |---|---|---|
-| ER | 5 | "PPT 加油猫猫 + 老板看到 + 大脑空白"——情感重 |
-| HP | 5 | 开头"PPT 第七页大屏中央 一只加油猫猫"具体反差强 |
-| QL | 5 | "加油猫猫救了我一命"双金句 |
-| NA | 4 | 单一时间线 + 反思，清晰但不复杂 |
-| AB | 4 | 一人公司题但 AI 焦虑普适 |
-| SR | 3 | AI 焦虑是议题但不是热点对峙 |
-| SAT | 2 | 共情调性，几乎无讽刺 |
+| ER | 5 | "PPT cheering cat + boss sees it + brain goes blank" — emotionally heavy |
+| HP | 5 | Opening "page 7 of the PPT, center of the big screen: a cheering cat" — concrete, strong contrast |
+| QL | 5 | "the cheering cat saved my life" — two quotable lines |
+| NA | 4 | single timeline + reflection, clear but not complex |
+| AB | 4 | one-person-company topic, but AI anxiety is universal |
+| SR | 3 | AI anxiety is an issue but not a hot confrontation |
+| SAT | 2 | empathetic tone, almost no satire |
 → composite ≈ 8.00
 
-🎯 押 bucket：30-100w，中枢 ~60w
-   概率分布: <5w 5% / 5-30w 22% / **30-100w 50%** / 100-150w 18% / >150w 5%
-   confidence: 🟢 中（基于 8 个校准样本，中枢 ±25%）
+🎯 Betting bucket: 30-100w, center ~60w
+   Probability distribution: <5w 5% / 5-30w 22% / **30-100w 50%** / 100-150w 18% / >150w 5%
+   confidence: 🟢 Medium (based on 8 calibration samples, center ±25%)
 
-🔍 锚点对比：
-| 对照 | composite | 实绩 | 异同 |
+🔍 Anchor comparison:
+| Comparison | composite | Actual | Similarities / differences |
 |---|---|---|---|
 | ... | ... | ... | ... |
 
-🤔 反事实：
-   如果 >100w → 验证 ER 主导假设强化
-   如果 30-100w → 基准线 ok
-   如果 <30w → 推翻 "AI 焦虑普适"，AB 偏乐观
+🤔 Counterfactuals:
+   If >100w → validates and strengthens the ER-dominance hypothesis
+   If 30-100w → baseline is OK
+   If <30w → refutes "AI anxiety is universal"; AB was optimistic
 
-🎲 关键校准假设：本篇 vs [对照] 押 1.5x
+🎲 Critical calibration hypothesis: this piece vs [comparison] bet 1.5x
 
 ——————————————————————————————
 
-回 "ok" 我直接落盘，
-或指出哪些维度 / 判断不对（如 "AB 给 3，太乐观" / "中枢应该 30w 不是 60w"）。
+Reply "ok" and I'll persist it directly,
+or point out which dimensions / judgments are wrong (e.g. "AB should be 3, too optimistic" / "the center should be 30w not 60w").
 ```
 
-用户三种回应：
+Three possible user responses:
 
-1. **"ok"** / "可以" / "继续" → 直接 Phase 6 落盘，header 标 `Scored By: claude`
-2. **"X 不对，应该 Y"** → Claude 改对应字段（不光改值，要更新 composite + 概率分布等连锁影响），重新展示 → 循环回 Phase 5.5
-3. **"全部重做"** → Phase 2-5 重跑（罕见，通常是 Claude 严重误判稿子调性）
+1. **"ok"** / "fine" / "continue" → go directly to Phase 6 persist, header marked `Scored By: claude`
+2. **"X is wrong, should be Y"** → Claude revises the corresponding field (not just the value — update the composite + probability distribution and other knock-on effects), shows it again → loop back to Phase 5.5
+3. **"redo everything"** → rerun Phases 2-5 (rare; usually means Claude badly misread the draft's tone)
 
-**用户挑刺的字段**记录到 prediction header 的 `User Override` 段（Phase 6 写入）：
-- 哪个维度 / 哪个数字被覆盖
-- AI 原值 vs 用户改后的值
+**Fields the user challenged** are recorded in the prediction header's `User Override` section (written in Phase 6):
+- Which dimension / which number was overridden
+- The AI's original value vs the user's revised value
 
-复盘时这个字段帮诊断：
-- 用户每次都 ok（claude 一致）→ 没有用户偏见污染
-- 用户经常覆盖某维度 → Claude 在该维度系统性偏离用户实际感觉
-- 覆盖维度被实绩验证 → 用户直觉准 → rubric 可能漏了什么
+During retro this field helps diagnose:
+- The user says ok every time (consistent with Claude) → no user-bias contamination
+- The user often overrides a particular dimension → Claude systematically diverges from the user's actual feel on that dimension
+- The overridden dimension is validated by actual performance → the user's intuition is accurate → the rubric may be missing something
 
-**用户挑刺的纪律**：
-- 用户**只能改字段值**，不能在 review 阶段塞新理由让 Claude 重写整段——那是把 Claude 当代笔
-- 改完 composite / 概率分布 / 锚点不一致 → Claude 自动连锁更新（不是用户算）
+**Discipline for user challenges**:
+- The user **may only change field values**; they cannot insert new reasoning during the review phase to make Claude rewrite a whole section — that turns Claude into a ghostwriter
+- After a change, if the composite / probability distribution / anchors become inconsistent → Claude updates them automatically (the user does not compute)
 
-### Phase 6: 落盘
+### Phase 6: Persist
 
-#### Phase 6a: v1 模式（新建预测文件）
+#### Phase 6a: v1 mode (new prediction file)
 
-文件名约定（[blind-prediction-protocol.md](../../shared-references/blind-prediction-protocol.md) 的"文件名约定"段）：
+Filename convention (the "filename convention" section of [blind-prediction-protocol.md](../../shared-references/blind-prediction-protocol.md)):
 ```
 predictions/YYYY-MM-DD_<id>_<short-title>.md
 ```
-- `YYYY-MM-DD`：今天日期（预测写下的日期）
-- `<id>`：12 位 hash，对稿子全文做 sha256 取前 12 位（稳定 ID，重写不变）
-- `<short-title>`：3-8 字，去标点
+- `YYYY-MM-DD`: today's date (the date the prediction is written)
+- `<id>`: 12-char hash — first 12 chars of sha256 of the full draft text (stable ID; unchanged on rewrite)
+- `<short-title>`: 3-8 characters, punctuation removed
 
-**第一段标题写 `## 预测 v1`**（不再写裸 `## 预测`——为将来可能的 v2 留 schema 一致性。老用户的 legacy `## 预测` 文件不动，hook 都识别）。
+**Write the first section heading as `## Prediction v1`** (no longer a bare `## Prediction` — to keep schema consistency for a possible v2 later. Legacy `## Prediction` files from old users are untouched; the hook recognizes both).
 
-**header 必填字段**：
-- `Article ID`（与 scripts/<id>.md 同 id）
-- `Script Path`（指向 scripts/<id>.md）
-- `Script Hash`（Phase 1 算出的）
-- `Calibration Samples` + `Confidence`（从 state 派生）
-- `Prediction Basis`：`pre_shoot`（v1 默认）
-- `Scored By`：`claude` / `claude+user_override`
-- **`BlindScored By`**：`subagent-v1`（Phase 2 默认）/ `main-claude-self`（`--skip-blind` 时） / `mixed`（Phase 2.5 用户裁定 b/c）
-- **`BlindScore Disagreement`**：JSON 字段列表，每维度 `{dim, blind, self, delta, decided_as}`，**所有维度必记**（即使 delta=0）
-- `User Override`（如有覆盖）：列出哪些字段被用户改了
-- 其他见 [prediction-anatomy.md](../../shared-references/prediction-anatomy.md) 组件 1
+**Required header fields**:
+- `Article ID` (same id as scripts/<id>.md)
+- `Script Path` (points to scripts/<id>.md)
+- `Script Hash` (computed in Phase 1)
+- `Calibration Samples` + `Confidence` (derived from state)
+- `Prediction Basis`: `pre_shoot` (v1 default)
+- `Scored By`: `claude` / `claude+user_override`
+- **`BlindScored By`**: `subagent-v1` (Phase 2 default) / `main-claude-self` (with `--skip-blind`) / `mixed` (Phase 2.5 user arbitration b/c)
+- **`BlindScore Disagreement`**: JSON field list, per dimension `{dim, blind, self, delta, decided_as}`, **every dimension must be recorded** (even delta=0)
+- `User Override` (if any): list which fields the user changed
+- For the rest see [prediction-anatomy.md](../../shared-references/prediction-anatomy.md) component 1
 
-留一个空的 `## 复盘` 段：
+Leave an empty `## Retrospective` section:
 ```markdown
-## 复盘
+## Retrospective
 
-（待填——T+RETRO_WINDOW_DAYS 天后跑 /cheat-retro <对应 video folder>）
+(To be filled — run /cheat-retro <matching video folder> after RETRO_WINDOW_DAYS days)
 ```
 
-#### Phase 6b: v2 模式（append 到既有文件）
+#### Phase 6b: v2 mode (append to an existing file)
 
-**绝不**用 Write 覆盖文件——会被 immutability hook 拦。用 **Edit** 在 `## 复盘` 之前插入 `## 预测 v2` 段：
+**Never** overwrite the file with Write — the immutability hook will block it. Use **Edit** to insert a `## Prediction v2` section before `## Retrospective`:
 
 ```python
-# 伪代码
-edit_old = "## 复盘\n"   # 单独一行，确保 hook awk 识别为 v1 段的边界
-edit_new = """## 预测 v2 (replaces v1; basis=post_shoot_pre_publish)
+# pseudocode
+edit_old = "## Retrospective\n"   # on its own line, so the hook's awk recognizes it as the boundary of the v1 section
+edit_new = """## Prediction v2 (replaces v1; basis=post_shoot_pre_publish)
 
-**Diff vs v1**: 改了 N 行（X→Y%），主要变化：[摘要]
-**重判触发**: cheat-shoot 检测稿子改动 ≥30%
-**Script Hash (v2)**: <新稿子 hash>
+**Diff vs v1**: changed N lines (X→Y%), main changes: [summary]
+**Re-judgment trigger**: cheat-shoot detected a draft change ≥30%
+**Script Hash (v2)**: <new draft hash>
 
-[7 组件 — 与 v1 同 anatomy]
+[7 components — same anatomy as v1]
 
 ---
 
-## 复盘
+## Retrospective
 """
 ```
 
-v1 段**不动**。v2 段头部明确写"replaces v1"——读者一眼知道哪段是有效预测。
+The v1 section **is untouched**. The v2 section header explicitly says "replaces v1" — the reader knows at a glance which section is the active prediction.
 
-cheat-retro 复盘时按"读最后一个 `## 预测 vN`"逻辑，自然取到 v2 算偏差。
+During retro, cheat-retro follows the "read the last `## Prediction vN`" logic and naturally picks up v2 to compute the deviation.
 
-#### 共用规则
+#### Shared rules
 
-**所有阶段都用统一完整版格式**（参考 [prediction-anatomy.md](../../shared-references/prediction-anatomy.md) "完整结构总览"）。confidence 低不缩格式，只让 header 标 confidence 等级 + 锚点对比段写"N/A 解释" + 概率分布更平。
+**Every stage uses the unified complete format** (see the "complete structure overview" in [prediction-anatomy.md](../../shared-references/prediction-anatomy.md)). Low confidence does not shrink the format — it only makes the header label the confidence level + the anchor comparison section write an "N/A explanation" + the probability distribution flatter.
 
-写文件**前**自检 7 个组件齐全（缺锚点 / 关键校准假设 → 写"N/A 解释段"，不删段）。
+Before writing the file, self-audit that all 7 components are present (missing anchors / critical calibration hypothesis → write an "N/A explanation section"; do not delete the section).
 
-### Phase 7: 更新 state file
+### Phase 7: Update the state file
 
-更新 `.cheat-state.json`：
+Update `.cheat-state.json`:
 ```json
 {
   "in_progress_session": {
@@ -370,83 +370,83 @@ cheat-retro 复盘时按"读最后一个 `## 预测 vN`"逻辑，自然取到 v2
     "started_at": "<ISO timestamp>",
     "rubric_version": "<v0/v2/...>"
   },
-  "last_prediction_self_scored": <true 仅当 --skip-blind / Phase 2.5 选 b>,
-  "last_self_scored_at": <ISO 当 last_prediction_self_scored=true 时>
+  "last_prediction_self_scored": <true only when --skip-blind / Phase 2.5 chose b>,
+  "last_self_scored_at": <ISO when last_prediction_self_scored=true>
 }
 ```
 
-`video_folder` 为 null 表示用户跑的是裸 .md 文件，没建 video folder。
+`video_folder` being null means the user ran it on a bare .md file and no video folder was created.
 
-`in_progress_session` 在 `cheat-publish` 触发时清除。如果用户预测后从未 publish（弃稿），下次 `/cheat-init` 或 `/cheat-status` 检测到陈旧 in_progress 会询问是否清理。
+`in_progress_session` is cleared when `cheat-publish` is triggered. If the user never publishes after predicting (abandoned draft), the next `/cheat-init` or `/cheat-status` detects the stale in_progress and asks whether to clean it up.
 
-`last_prediction_self_scored`：
-- `true` 仅当本次预测走了 `--skip-blind` 或 Phase 2.5 用户选了 b（信主 Claude 自估）
-- 一旦 `true` → cheat-status 持续 nag："上次预测没走 blind sub-agent，已 N 天"——直到下次 normal `cheat-predict`（走 sub-agent）触发后才清回 `false`
-- `last_self_scored_at` 跟随更新；下次 `cheat-predict` 走 sub-agent → 这两个字段一起被重置
+`last_prediction_self_scored`:
+- `true` only when this prediction used `--skip-blind` or the user chose b in Phase 2.5 (trusting the main Claude self-estimate)
+- Once `true` → cheat-status keeps nagging: "the last prediction did not go through the blind sub-agent, N days ago" — until the next normal `cheat-predict` (which uses the sub-agent) triggers a reset back to `false`
+- `last_self_scored_at` updates alongside; the next `cheat-predict` using the sub-agent → both fields are reset together
 
-### Phase 8: 控制台总结
+### Phase 8: Console summary
 
-**Cold-start-simple 模式**：
-
-```
-✅ 预测落盘（cold-start 简化版）：predictions/2026-05-04_a3f2c1d4e5b6_停止期待.md
-
-7 维打分：ER5 / HP5 / QL4 / NA3 / AB5 / SR2 / SAT4
-方向押注：比上一篇明显好（ER+HP 双 5）
-对比对象：N/A（这是第 1 篇）
-
-⚠️  ## 预测段已 immutable（hook 锁定）。
-⚠️  这是 cold-start 期简化版——没有 bucket 数字。前 5 篇都这样。
-   第 5 篇复盘后会自动解锁完整预测（bucket / 概率 / 锚点 / 反事实）。
-
-进度：第 N 篇 / 共 5 篇 cold-start 期
-
-下一步：
-- 发布后 → "已发布 https://..."
-- T+3 天 → "复盘 predictions/2026-05-04_..."
-```
-
-**Complete 模式**：
+**Cold-start-simple mode**:
 
 ```
-✅ 预测落盘：predictions/2026-05-04_a3f2c1d4e5b6_停止期待.md
+✅ Prediction persisted (cold-start simplified): predictions/2026-05-04_a3f2c1d4e5b6_stop-expecting.md
 
-bucket 押注：30-100w（中枢 50w）
-关键校准假设：本篇 vs 谁问你了 = 1.5-2x
+7 dimension scores: ER5 / HP5 / QL4 / NA3 / AB5 / SR2 / SAT4
+Directional bet: clearly better than the previous piece (ER+HP both 5)
+Comparison: N/A (this is piece 1)
 
-⚠️  ## 预测 段已 immutable（hook 锁定）。
-⚠️  你不能再向我"透露"这条作品的播放数据，否则下次复盘的盲度声明失效。
-   如果你不小心看到了，告诉我——我会在文件里补一个 integrity warning。
+⚠️  The ## Prediction section is now immutable (hook-locked).
+⚠️  This is the cold-start simplified version — no bucket numbers. The first 5 pieces are like this.
+   After the 5th retro the complete prediction unlocks automatically (bucket / probabilities / anchors / counterfactuals).
 
-下一步：
-- 发布后 → "已发布 https://..."
-- T+3 天 → "复盘 predictions/2026-05-04_..."
+Progress: piece N / 5 in the cold-start stage
+
+Next steps:
+- After publishing → "shipped https://..."
+- T+3 days → "retro predictions/2026-05-04_..."
+```
+
+**Complete mode**:
+
+```
+✅ Prediction persisted: predictions/2026-05-04_a3f2c1d4e5b6_stop-expecting.md
+
+bucket bet: 30-100w (center 50w)
+Critical calibration hypothesis: this piece vs Who asked you = 1.5-2x
+
+⚠️  The ## Prediction section is now immutable (hook-locked).
+⚠️  You can no longer "reveal" this piece's play data to me, or the blind-status claim in the next retro is invalid.
+   If you accidentally saw it, tell me — I'll add an integrity warning to the file.
+
+Next steps:
+- After publishing → "shipped https://..."
+- T+3 days → "retro predictions/2026-05-04_..."
 ```
 
 ## Key Rules
 
-1. **blind check 是硬门槛**。BLIND_CHECK=strict 模式下，触犯即终止，不允许"软处理"。lenient 仅用于演练
-2. **整数维度分**。同 cheat-score
-3. **概率分布 = 100%**。不允许 95% + 8%；要么诚实给 50% + 30% + 15% + 5%，要么承认不知道
-4. **必须有 `## 复盘` 占位空段**——否则 hook 不知道哪里是 immutable 边界
-5. **不允许"先写文件再讨论分数"**——文件落盘后预测段就锁了；讨论必须发生在 Phase 2 之后、Phase 6 之前
-6. **id 是稿子 hash，不是时间戳**——重写 _redo.md 时 id 不变，便于跨文件追溯
+1. **blind check is a hard gate**. In BLIND_CHECK=strict mode, a violation terminates the run; no "soft handling" is allowed. lenient is only for drills
+2. **Integer dimension scores**. Same as cheat-score
+3. **Probability distribution = 100%**. 95% + 8% is not allowed; either honestly give 50% + 30% + 15% + 5%, or admit you do not know
+4. **There must be an empty `## Retrospective` placeholder section** — otherwise the hook does not know where the immutable boundary is
+5. **"Write the file first, discuss the score later" is not allowed** — once the file is persisted the prediction section is locked; discussion must happen after Phase 2 and before Phase 6
+6. **The id is the draft hash, not a timestamp** — when rewriting `_redo.md` the id does not change, making cross-file tracing easy
 
 ## Refusals
 
-- 「我已经看过播放数据了，但你假装没看到给我做个预测」 → 拒绝。BLIND_CHECK=strict 直接终止
-- 「我把预测段先写一版，等数据出来再调」 → 拒绝。这是把 immutable 协议反着用
-- 「我改稿了想让你覆盖之前的预测，不要 v2 段」 → 拒绝。v1 是档案，v2 才是当前判断——append 不覆盖。即使你"主观感觉 v1 完全错了"，git history 里 v1 还能查，但工作目录里 v1 必须留
-- 「跳过反事实场景，太麻烦」 → 拒绝。反事实是复盘诊断的依据，缺它复盘退化为"准 / 不准"
-- 「可不可以只写 bucket，不写概率分布」 → 拒绝。概率分布是逼你诚实的工具
-- 「这次先用 lenient 模式，下次再 strict」 → 询问原因。如果是测试 / 演练 → 允许且文件明确标 reconstructed；如果是想偷懒 → 拒绝
-- 「sub-agent 太慢，你直接打就行」 → 用 `--skip-blind` flag 显式声明。**不接受**主 Claude 自作主张跳过 sub-agent。flag 触发 state.last_prediction_self_scored=true，cheat-status 持续提示直到下次 normal 调用清除
-- 「Phase 2.5 选 b 后我不想标 last_prediction_self_scored=true」 → 拒绝。选 b 等于"我有意接受主 Claude 自评"——必须留下污染追踪轨迹
-- 「我是 cold-start 但想跑完整版预测，给我 bucket 数字」 → 拒绝。前 5 篇 bucket 数字是 false precision，给反而误导。等第 5 篇复盘后 cheat-status 会主动提示解锁。如果用户确实想要数字（罕见，自我教育目的）→ 允许但在文件头醒目标 `**Numerical predictions in cold-start are NOT predictive — for self-education only**`
+- "I've already seen the play data, but pretend you didn't and make a prediction for me" → refuse. BLIND_CHECK=strict terminates immediately
+- "Let me write a version of the prediction section first, then adjust it once the data comes out" → refuse. That uses the immutable protocol backwards
+- "I revised the draft and want you to overwrite the previous prediction, no v2 section" → refuse. v1 is the archive; v2 is the current judgment — append, do not overwrite. Even if you "subjectively feel v1 was completely wrong", v1 remains visible in git history, but v1 must stay in the working directory
+- "Skip the counterfactual scenarios, too much hassle" → refuse. Counterfactuals are the basis for retrospective diagnosis; without them the retro degrades to "accurate / inaccurate"
+- "Can I write only the bucket, not the probability distribution?" → refuse. The probability distribution is the tool that forces you to be honest
+- "Use lenient mode this time, strict next time" → ask why. If it is a test / drill → allow and clearly mark the file reconstructed; if it is laziness → refuse
+- "The sub-agent is too slow; just score it yourself" → use the `--skip-blind` flag to declare it explicitly. **Not accepted** for the main Claude to unilaterally skip the sub-agent. The flag triggers state.last_prediction_self_scored=true, and cheat-status keeps warning until a normal call clears it
+- "After choosing b in Phase 2.5 I don't want to mark last_prediction_self_scored=true" → refuse. Choosing b equals "I deliberately accept the main Claude's self-estimate" — the contamination trail must be recorded
+- "I'm cold-start but want the full prediction with bucket numbers" → refuse. Bucket numbers in the first 5 pieces are false precision; giving them misleads. After the 5th retro, cheat-status proactively suggests unlocking. If the user really insists (rare, for self-education) → allow but prominently mark the file header `**Numerical predictions in cold-start are NOT predictive — for self-education only**`
 
 ## Integration
 
-- 前置：`/cheat-init` 必须完成 + `rubric_notes.md` 存在
-- 上游可选：`/cheat-score` 反复尝试不同稿子版本
-- 下游：`/cheat-publish`（发布登记）→ `/cheat-retro`（复盘）→ 累计 ≥ MIN_SAMPLES 后 `/cheat-bump`
-- hook 依赖：`hooks/prediction-immutability.sh` 必须已安装在用户 `.claude/settings.json`，否则 immutability 仅靠 SKILL.md 自律——`cheat-status` 会持续提示
+- Prerequisite: `/cheat-init` must be complete + `rubric_notes.md` exists
+- Optional upstream: `/cheat-score` to try different draft versions repeatedly
+- Downstream: `/cheat-publish` (publish registration) → `/cheat-retro` (retro) → `/cheat-bump` after accumulating ≥ MIN_SAMPLES
+- Hook dependency: `hooks/prediction-immutability.sh` must be installed in the user's `.claude/settings.json`; otherwise immutability relies only on SKILL.md self-discipline — `cheat-status` keeps reminding

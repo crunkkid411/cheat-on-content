@@ -1,68 +1,68 @@
-# bilibili-stat — B站 perf-data adapter
+# bilibili-stat — Bilibili perf-data adapter
 
-回收**自己（或任意）B站视频**的播放数据 + 热门评论，供 `/cheat-retro` 复盘。
+Collects play data + top comments for **your own (or any) Bilibili video**, for `/cheat-retro` retrospectives.
 
-被 `/cheat-retro` 调用：当 `state.data_collection=adapter` 且 `Platform: bilibili` 时。
+Called by `/cheat-retro` when `state.data_collection=adapter` and `Platform: bilibili`.
 
-## 为什么它比抖音/小红书 adapter 简单
+## Why it is simpler than the Douyin / Xiaohongshu adapters
 
-B站的视频统计（`view`）与评论（`reply`）都是**公开接口**：
+Bilibili's video statistics (`view`) and comments (`reply`) are both **public APIs**:
 
-- 不需要登录（没有 `crawler.py login` 步骤、不碰 `.auth/`）
-- 不需要 wbi 签名（`view` 接口免签名；评论走 `x/v2/reply` 老接口，按热度 `sort=2`）
-- 不需要浏览器（纯 `httpx`，无 playwright）
+- No login needed (no `crawler.py login` step, no `.auth/`)
+- No wbi signature needed (the `view` API needs no signature; comments use the older `x/v2/reply` API with `sort=2` by popularity)
+- No browser needed (pure `httpx`, no playwright)
 
-所以 **clone 下来装个 `httpx` 就能用**，零配置。
+So **clone it and install `httpx` and it works**, with zero configuration.
 
-## 安装
+## Installation
 
 ```bash
 pip install -r requirements.txt
 ```
 
-（若你的内容项目根有 `.venv`，run.sh 会优先用它；否则用系统 `python3`/`python`。）
+(If your content project root has a `.venv`, run.sh prefers it; otherwise it uses the system `python3`/`python`.)
 
-## 用法
+## Usage
 
-`/cheat-retro` 会自动按下面的契约调用，一般你不用手动跑：
+`/cheat-retro` calls it automatically per the contract below; you generally do not need to run it by hand:
 
 ```bash
 bash run.sh <bvid_or_url> <video_folder> [<script_path>]
 ```
 
-- `<bvid_or_url>`：`BV1cUoUY9Ecr`，或任意含 BV 号的链接（如 `https://www.bilibili.com/video/BV1cUoUY9Ecr`）
-- `<video_folder>`：输出目录，`report.md` 会写进这里
-- `<script_path>`：可选，原始稿子，会并入 report.md 供复盘 diff
+- `<bvid_or_url>`: `BV1cUoUY9Ecr`, or any link containing a BV number (e.g. `https://www.bilibili.com/video/BV1cUoUY9Ecr`)
+- `<video_folder>`: output directory; `report.md` is written here
+- `<script_path>`: optional original script, merged into report.md for the retrospective diff
 
-也可直接调底层：
+You can also call the lower level directly:
 
 ```bash
-python review.py video BV1cUoUY9Ecr           # 抓数据 → 写 videos/<auto>/report.md
-python review.py login                        # B站无需登录，仅打印说明（接口一致性）
+python review.py video BV1cUoUY9Ecr           # fetch data → write videos/<auto>/report.md
+python review.py login                        # Bilibili needs no login; just prints an explanation (API consistency)
 ```
 
-## 输出（report.md）
+## Output (report.md)
 
-与 douyin-session 同格式，含：
+Same format as douyin-session, containing:
 
-- 视频元信息（标题 / UP主 / 发布时间 / 时长 / 链接）
-- **播放数据**：播放、点赞、投币、收藏、分享、评论、弹幕，并附派生比率（赞播比 / 投币率 / 收藏率 / 分播比）——B站「三连率」尤其能反映硬核认可度
-- 原始稿子（若提供）
-- **热门评论**（按点赞降序，带 IP 属地）
+- Video metadata (title / uploader / publish time / duration / link)
+- **Play data**: plays, likes, coins, saves, shares, comments, danmaku, plus derived ratios (like-to-play / coin rate / save rate / share-to-play) — Bilibili's "triple-combo rate" is especially indicative of hardcore approval
+- The original script (if provided)
+- **Top comments** (sorted by likes descending, with IP location)
 
-## 接口
+## APIs
 
-| 数据 | 接口 |
+| Data | API |
 |---|---|
-| 视频统计 | `GET https://api.bilibili.com/x/web-interface/view?bvid=<BV号>` |
-| 评论 | `GET https://api.bilibili.com/x/v2/reply?type=1&oid=<aid>&sort=2&pn=&ps=20` |
+| Video statistics | `GET https://api.bilibili.com/x/web-interface/view?bvid=<BV number>` |
+| Comments | `GET https://api.bilibili.com/x/v2/reply?type=1&oid=<aid>&sort=2&pn=&ps=20` |
 
-`oid` 取自 view 接口返回的 `aid`。评论按热度（`sort=2`）翻页，默认取 top 50。
+`oid` comes from the `aid` returned by the view API. Comments page by popularity (`sort=2`), taking the top 50 by default.
 
-## 退出码
+## Exit codes
 
-`0` 成功 · `2` 缺依赖（httpx 未装）· `3` 其他失败（网络 / 解析 / BV 号错误）。任何失败时 `/cheat-retro` 会优雅降级到 manual 模式。
+`0` success · `2` missing dependency (httpx not installed) · `3` other failure (network / parsing / wrong BV number). On any failure, `/cheat-retro` degrades gracefully to manual mode.
 
-## 字段随接口改版的维护
+## Maintaining fields across API redesigns
 
-`view` 的 `stat` 字段名（view/like/coin/favorite/share/reply/danmaku）和评论的 `replies[].{like,content.message,member.uname,rcount,reply_control.location}` 都已按 2026-06 真实返回校准。若 B站改版导致某项为 0，对照 `crawler.py` 的 `fetch_video` / `_normalize_comment` 调整 key 即可。
+The `stat` field names of `view` (view/like/coin/favorite/share/reply/danmaku) and the comment fields `replies[].{like,content.message,member.uname,rcount,reply_control.location}` are calibrated against real 2026-06 responses. If a Bilibili redesign makes a field 0, adjust the keys in `fetch_video` / `_normalize_comment` in `crawler.py`.

@@ -1,7 +1,7 @@
-"""视频号助手创作者后台抓取。
+"""WeChat Channels assistant creator-backend crawler.
 
-使用 Playwright 持久化登录态，被动监听后台页面自行发出的 JSON 请求。
-不伪造签名，不读取微信客户端数据。
+Uses Playwright with a persistent login session and passively listens for the JSON requests
+the backend page sends itself. Does not forge signatures and does not read WeChat client data.
 """
 from __future__ import annotations
 
@@ -66,14 +66,14 @@ async def ensure_login(timeout_s: int = 300) -> bool:
     try:
         page = sess.ctx.pages[0] if sess.ctx.pages else await sess.ctx.new_page()
         await page.goto(PLATFORM_HOME, wait_until="domcontentloaded", timeout=60000)
-        print(f"[登录] 请在弹出的窗口扫码登录视频号助手，最多等待 {timeout_s} 秒。")
+        print(f"[login] Scan the QR code in the popup window to log in to the WeChat Channels assistant; waiting up to {timeout_s} seconds.")
         for i in range(timeout_s):
             if await _logged_in(page):
-                print(f"[登录] ✓ 已检测到视频号助手登录态（用时 {i}s）")
+                print(f"[login] OK: WeChat Channels assistant login detected ({i}s)")
                 await asyncio.sleep(2)
                 return True
             await asyncio.sleep(1)
-        print("[登录] 超时，未检测到登录态。")
+        print("[login] Timed out without detecting a login.")
         return False
     finally:
         await sess.close()
@@ -242,7 +242,7 @@ async def fetch_recent_posts(sess: Session, limit: int = 50) -> list[dict]:
         # The content app is loaded dynamically after expanding the sidebar.
         # Click across all frames because Tencent occasionally mounts it in an iframe.
         if not await _click_text(page, "内容管理"):
-            print("[诊断] 未找到“内容管理”入口。")
+            print("[diagnostic] Could not find the \"Content Management\" (内容管理) entry.")
         await asyncio.sleep(4)
 
         # Content Management may open its own route before rendering the submenu.
@@ -271,7 +271,7 @@ async def fetch_recent_posts(sess: Session, limit: int = 50) -> list[dict]:
         posts = _dedupe_posts(posts)
 
         if not posts:
-            print(f"[诊断] 暂未解析到作品；本次在内存中检查了 {len(captured)} 个 JSON 响应，未写入原始数据。")
+            print(f"[diagnostic] No posts parsed yet; inspected {len(captured)} JSON responses in memory this run, no raw data written.")
         return posts[:limit]
     finally:
         await page.close()
@@ -289,10 +289,10 @@ async def capture_comment_management(sess: Session, title_hint: str = "") -> dic
         await page.goto(PLATFORM_HOME, wait_until="domcontentloaded", timeout=60000)
         await asyncio.sleep(5)
         if not await _click_text(page, "互动管理"):
-            print("[诊断] 未找到“互动管理”入口。")
+            print("[diagnostic] Could not find the \"Interaction Management\" (互动管理) entry.")
         await asyncio.sleep(4)
         if not await _click_text(page, "评论"):
-            print("[诊断] 未找到“评论”子菜单。")
+            print("[diagnostic] Could not find the \"Comments\" (评论) submenu.")
         await asyncio.sleep(10)
 
         clicked_post = False
@@ -322,7 +322,7 @@ async def capture_comment_management(sess: Session, title_hint: str = "") -> dic
             await page.mouse.wheel(0, 1200)
             await asyncio.sleep(2)
 
-        print(f"[评论诊断] 本次在内存中检查了 {len(captured)} 个 JSON 响应，未写入原始数据。")
+        print(f"[comment diagnostic] Inspected {len(captured)} JSON responses in memory this run, no raw data written.")
         return {"captured_count": len(captured)}
     finally:
         await page.close()
@@ -428,7 +428,7 @@ async def fetch_comments_creator(
             await asyncio.sleep(2)
 
         if not clicked:
-            print(f"[评论] 未在评论管理列表中定位作品：{title_hint[:30]}")
+            print(f"[comments] Could not locate the post in the comment-management list: {title_hint[:30]}")
             return []
         await asyncio.sleep(8)
 
@@ -442,7 +442,7 @@ async def fetch_comments_creator(
             None,
         )
         if not packet:
-            print("[评论] 点选作品后未捕获 comment_list 接口。")
+            print("[comments] Did not capture the comment_list API after selecting the post.")
             return []
 
         try:
@@ -451,7 +451,7 @@ async def fetch_comments_creator(
             request_body = {}
         # Refuse accidental cross-post data: the request must match the target.
         if request_body.get("exportId") != post_id:
-            print("[评论] 捕获到的作品 ID 与目标不一致，停止以避免串评论。")
+            print("[comments] The captured post ID does not match the target; stopping to avoid mixing comments.")
             return []
 
         all_comments = _comments_from_payload(packet["data"])
@@ -473,7 +473,7 @@ async def fetch_comments_creator(
             page_count += 1
 
         comments = _dedupe_comments(all_comments)
-        print(f"[评论] 抓到 {len(comments)} 条（{page_count} 页）")
+        print(f"[comments] Captured {len(comments)} comments ({page_count} pages)")
         return comments
     finally:
         await page.close()
@@ -485,8 +485,8 @@ async def fetch_post(sess: Session, post_id: str) -> dict:
         if post["post_id"] == post_id:
             return post
     raise LookupError(
-        f"未在视频号助手最近 200 条作品中找到 post_id={post_id}。"
-        "为避免把未知作品误记为 0 播放，本次不生成 report.md。"
+        f"post_id={post_id} was not found among the WeChat Channels assistant's latest 200 posts. "
+        "To avoid recording an unknown post as 0 plays, no report.md is generated for this run."
     )
 
 
@@ -514,5 +514,5 @@ if __name__ == "__main__":
     try:
         asyncio.run(ensure_login())
     except LookupError as exc:
-        print(f"[错误] {exc}", file=sys.stderr)
+        print(f"[error] {exc}", file=sys.stderr)
         raise SystemExit(3) from exc

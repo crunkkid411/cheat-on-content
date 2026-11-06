@@ -1,137 +1,137 @@
-# Blind Prediction Protocol（盲预测协议）
+# Blind Prediction Protocol
 
-被这些子 skill 引用：`cheat-predict`、`cheat-retro`、主 SKILL.md。
+Referenced by these sub-skills: `cheat-predict`, `cheat-retro`, and the main SKILL.md.
 
-这是项目原则 #1 的完整规范。任何子 skill 在写预测前都必须执行本协议。
-
----
-
-## 核心定义
-
-**盲预测**：在预测者（人或模型）看到任何关于该作品发布后真实表现数据**之前**完成的预测。
-
-预测一旦写入 `predictions/*.md` 的 `## 预测` 段，该段即为 **immutable**——只能在文件末尾追加 `## 复盘` 段，不能修改预测段任何字符。
+This is the full specification of project principle #1. Every sub-skill must execute this protocol before writing a prediction.
 
 ---
 
-## "见过数据"的边界（关键，常被违反）
+## Core definition
 
-下列任一条件成立 → 已不再 blind，**禁止写预测**：
+**Blind prediction**: a prediction completed **before** the predictor (human or model) sees any data about how the piece actually performed after publication.
 
-| 信息 | 是否破坏 blind | 例外 |
+Once a prediction is written into the `## Prediction` section of `predictions/*.md`, that section is **immutable** — you may only append a `## Retrospective` section at the end of the file; not a single character of the prediction section may change.
+
+---
+
+## The boundary of "having seen data" (critical, frequently violated)
+
+If any of the following is true → the prediction is no longer blind, and **writing a prediction is forbidden**:
+
+| Information | Breaks blindness? | Exception |
 |---|---|---|
-| 该作品任何平台的播放数 / 阅读数 | ✗ 破坏 | 无 |
-| 该作品的点赞 / 评论 / 转发数 | ✗ 破坏 | 无 |
-| 该作品的具体评论内容 | ✗ 破坏 | 无 |
-| 该作品的算法推荐位 / 热门榜位置 | ✗ 破坏 | 无 |
-| 该作品发布后的截图 / 后台数据 | ✗ 破坏 | 无 |
-| **同期发布的其他人**作品的表现 | ○ 不破坏 | — |
-| **历史上类似主题**作品的表现 | ○ 不破坏（这正是锚点对比要做的） | — |
-| 该作品**发布前**的稿子内容 | ○ 不破坏 | 这是预测的输入 |
-| 用户口述的"我感觉这条还行" | △ 谨慎 | 用户的主观感觉不算"数据"，但要在预测里标注用户偏见 |
+| Play count / read count for this piece on any platform | ✗ breaks it | None |
+| Like / comment / repost counts for this piece | ✗ breaks it | None |
+| The actual comment text on this piece | ✗ breaks it | None |
+| Algorithmic recommendation slot / trending position for this piece | ✗ breaks it | None |
+| Post-publish screenshots / backend analytics | ✗ breaks it | None |
+| Performance of **other people's** pieces published in the same period | ○ does not break it | — |
+| Performance of **historically similar topics** | ○ does not break it (this is exactly what anchor comparison is for) | — |
+| The piece's **pre-publish** draft content | ○ does not break it | This is the prediction input |
+| The user saying "I feel this one is decent" | △ caution | The user's subjective feeling is not "data", but note the bias in the prediction |
 
-**判断捷径**：只要这条信息**只能在作品发布后才能获得**，就算"数据"。
-
----
-
-## 预测者必须主动声明的情况
-
-子 skill 在启动 `cheat-predict` 前，必须自检并向用户**主动声明**：
-
-1. **作品已发布超过 RETRO_WINDOW_DAYS 天**（默认 3 天）→ 必须拒绝写"预测"，改记为 `**Reconstructed retrospective**`，明确标注非预测
-2. **作品已发布但 < RETRO_WINDOW_DAYS 天，用户尚未透露任何数据**→ 允许 blind 预测，但在文件头部标记 `published_before_prediction: true` + `blind_status: confirmed_no_data_seen`
-3. **用户在对话里已粘贴了任何后续数据**→ 同 #1 处理，记为 reconstructed
-
-`BLIND_CHECK=strict`（默认）：上述任何破坏条件命中，**拒绝执行**。
-`BLIND_CHECK=lenient`：仅警告 + 强制标注，允许继续——只用于离线测试或学术演练，**不推荐用于真实校准**。
+**Shortcut**: if the information **could only be obtained after publication**, it counts as "data".
 
 ---
 
-## Immutable 的工程边界
+## Situations the predictor must proactively disclose
 
-`## 预测` 段的不可修改是**用户体验承诺**，由 hook 层强制：
+Before starting `cheat-predict`, the sub-skill must self-check and **proactively disclose** to the user:
 
-- `hooks/prediction-immutability.sh` 在 PreToolUse(Edit|Write) 上检查 `predictions/` 下文件
-- 命中 `## 预测` 与下一个二级标题之间任何 diff → exit 1 阻塞
-- `## 复盘` 段的追加 → 放行
+1. **The piece was published more than RETRO_WINDOW_DAYS days ago** (default 3 days) → must refuse to write a "prediction"; record it as a `**Reconstructed retrospective**` and clearly mark it as not a prediction
+2. **The piece is published but < RETRO_WINDOW_DAYS days ago, and the user has not revealed any data** → blind prediction is allowed, but mark the file header with `published_before_prediction: true` + `blind_status: confirmed_no_data_seen`
+3. **The user has already pasted any post-publication data into the conversation** → handle like #1, record as reconstructed
 
-**禁止的"绕开"模式**（子 skill 必须拒绝）：
-- "把预测段重写得更准一点" → 拒绝。如有正当理由重做，创建新文件 `<原文件名>_redo.md`，原文件保留
-- "我的概率分布写错了 0.5%，让我改一下" → 拒绝。在复盘段追加 `修正：原概率分布 X% 应为 Y%，于 <date> 发现笔误`
-- "我前面没考虑 SR=4，重打一下分" → 拒绝。同上路径
-
-唯一允许编辑预测段的场景：**纯 markdown 排版错误**（标题层级错误、列表 bullet 格式错），且用户明确说明这是格式修复。这种情况 hook 仍会阻塞，需要用户显式 bypass（手动设置环境变量 `CHEAT_BYPASS_IMMUTABILITY=1` 单次）——bypass 应在 git history 留痕。
+`BLIND_CHECK=strict` (default): if any breaking condition above is hit, **refuse to execute**.
+`BLIND_CHECK=lenient`: warn and force a label, then allow continuation — only for offline tests or academic exercises, **not recommended for real calibration**.
 
 ---
 
-## 文件名约定（**三处一致**）
+## Engineering boundary of immutability
 
-一个内容三处文件，**用同一组 `<date>_<id>_<short>` 命名**：
+The immutability of the `## Prediction` section is a **user-experience promise**, enforced at the hook layer:
+
+- `hooks/prediction-immutability.sh` checks files under `predictions/` on PreToolUse(Edit|Write)
+- Any diff between `## Prediction` and the next H2 → exit 1, blocked
+- Appending to `## Retrospective` → allowed
+
+**Forbidden "workaround" patterns** (sub-skills must refuse):
+- "Rewrite the prediction section to be a bit more accurate" → refuse. If there is a legitimate reason to redo it, create a new file `<original-name>_redo.md` and keep the original
+- "My probability distribution was off by 0.5%, let me fix it" → refuse. Append to the retrospective: `Correction: original probability distribution X% should have been Y%, typo discovered on <date>`
+- "I didn't consider SR=4 earlier, let me re-score it" → refuse. Same path as above
+
+The only scenario where editing the prediction section is allowed: **pure markdown formatting errors** (wrong heading level, wrong list bullet format), and the user explicitly states it is a formatting fix. The hook will still block this case; the user needs an explicit bypass (set `CHEAT_BYPASS_IMMUTABILITY=1` for a single run) — the bypass should leave a trace in git history.
+
+---
+
+## Filename convention (**consistent in all three places**)
+
+One piece of content uses three files, **all named with the same `<date>_<id>_<short>` group**:
 
 ```
-scripts/<date>_<id>_<short>.md        ← pre-shoot 草稿（cheat-seed 写或用户写）
-predictions/<date>_<id>_<short>.md    ← immutable 预测（cheat-predict 写）
-videos/<date>_<id>_<short>/           ← 拍后才建（cheat-shoot 创建）
-  ├── script.md                       ← 用户提供的最终拍摄稿
-  └── report.md                       ← T+3d 数据（cheat-retro 写）
+scripts/<date>_<id>_<short>.md        ← pre-shoot draft (written by cheat-seed or the user)
+predictions/<date>_<id>_<short>.md    ← immutable prediction (written by cheat-predict)
+videos/<date>_<id>_<short>/           ← created only after shooting (by cheat-shoot)
+  ├── script.md                       ← final shooting script supplied by the user
+  └── report.md                       ← T+3d data (written by cheat-retro)
 ```
 
-- `<date>`：**草稿首次落盘日期**（即 `scripts/<id>.md` 的创建日），不是预测日 / 拍摄日 / 发布日。理由：保持 ID 稳定——草稿大改后 hash 变了仍想保持文件可追溯
-- `<id>`：12 位 sha256 前缀，对**草稿首次落盘的内容**做 hash。用户 edit 草稿后**不变**——便于跨文件引用
-- `<short>`：3-8 字中文或英文短名，便于人类辨识
+- `<date>`: **the date the draft was first written to disk** (i.e. `scripts/<id>.md` creation date), not the prediction / shoot / publish date. Reason: keep the ID stable — the draft can be heavily revised, its hash changes, but the files should remain traceable
+- `<id>`: 12-character sha256 prefix, hashed from **the content of the draft when first written**. It **does not change** when the user edits the draft — this makes cross-file references stable
+- `<short>`: 3-8 character short name (Chinese or English) for human recognition
 
-Reconstructed 重做：在 `<short>` 后加 `_redo`，三处都加：
+Reconstructed redo: append `_redo` to `<short>` in all three places:
 - `scripts/<date>_<id>_<short>_redo.md`
 - `predictions/<date>_<id>_<short>_redo.md`
 - `videos/<date>_<id>_<short>_redo/`
 
-原文件保留（不删）。
+Keep the original files (do not delete them).
 
 ---
 
-## 子 skill 必须做的检查清单
+## Checklist every sub-skill must run
 
-`cheat-predict` 启动时：
-1. 读 `BLIND_CHECK` 常量
-2. 询问用户该作品当前发布状态（未发 / 已发 < RETRO_WINDOW_DAYS / 已发 ≥ RETRO_WINDOW_DAYS）
-3. 询问对话历史里是否提到过该作品的任何后续数据（如有，自检对话里有没有 "播放/阅读/点赞/评论" 等关键词）
-4. 若 #2 或 #3 命中破坏条件 → 按 `BLIND_CHECK` 模式处理
-5. 通过后才允许写 `predictions/*.md`
+When `cheat-predict` starts:
+1. Read the `BLIND_CHECK` constant
+2. Ask the user for the piece's current publish status (not published / published < RETRO_WINDOW_DAYS / published ≥ RETRO_WINDOW_DAYS)
+3. Ask whether any post-publication data about the piece has appeared in the conversation history (if unsure, check the conversation for keywords such as "plays / reads / likes / comments")
+4. If #2 or #3 hits a breaking condition → handle according to the `BLIND_CHECK` mode
+5. Only after passing may you write `predictions/*.md`
 
-`cheat-retro` 启动时：
-1. 读目标 prediction 文件
-2. **先在内存里 cache 住 `## 预测` 段**——后续任何对该文件的写都必须先校验该段未变
-3. 抓数据 → 追加 `## 复盘` 段
-4. 写完后**再次校验**：写入后该文件的 `## 预测` 段哈希应等于步骤 2 的 cache。不等 → 报错并回滚
+When `cheat-retro` starts:
+1. Read the target prediction file
+2. **Cache the `## Prediction` section in memory first** — every later write to that file must first verify that the section is unchanged
+3. Fetch data → append the `## Retrospective` section
+4. After writing, **verify again**: the post-write hash of the `## Prediction` section must equal the cache from step 2. If not → error out and roll back
 
-主 SKILL.md：
-- 用户说出"重写预测" / "改一下预测段" / "你之前预测错了我帮你改" 时，**直接拒绝并解释**，引导改用 `_redo.md` 路径
+Main SKILL.md:
+- When the user says "rewrite the prediction" / "change the prediction section" / "you predicted wrong before, let me fix it for you", **refuse directly and explain**, and steer them to the `_redo.md` path
 
 ---
 
-## 异常状态处理
+## Handling abnormal states
 
-| 场景 | 处理 |
+| Scenario | Handling |
 |---|---|
-| 预测文件不小心被人手编辑了预测段 | 不自动回滚（破坏更大）。下次 `cheat-retro` 检测到不一致 → 在复盘段追加 `**Integrity warning**: 预测段于 <ISO timestamp> 被外部修改，无法保证盲度`，校准价值降级为"参考"，不计入 bump 校准池 |
-| 预测文件遗失 / 被删 | git log 找回。找不到 → 在 `rubric_notes.md` 记录"<id> 预测文件遗失，校准池缺该样本" |
-| 用户原本是 cold-start，半路想"补"已发作品的预测 | 一律记为 `**Reconstructed retrospective**`，不计入校准池——这是补的不是预测。可作为"观察"记录到 `rubric_notes.md` |
+| The prediction section was accidentally edited by hand | Do not auto-rollback (that causes more damage). The next `cheat-retro` detects the mismatch → append to the retrospective: `**Integrity warning**: the prediction section was externally modified at <ISO timestamp>; blindness cannot be guaranteed`. Downgrade the calibration value to "reference" and exclude it from the bump calibration pool |
+| Prediction file lost / deleted | Recover from git log. If not found → record in `rubric_notes.md`: "<id> prediction file lost; the calibration pool is missing this sample" |
+| The user started cold-start and midway wants to "backfill" a prediction for an already-published piece | Always record it as a `**Reconstructed retrospective**` and exclude it from the calibration pool — it is a backfill, not a prediction. It may be recorded as an "observation" in `rubric_notes.md` |
 
 ---
 
-## 反模式（必须拒绝的请求）
+## Anti-patterns (requests that must be refused)
 
-- 「帮我预测一下，但我先告诉你播放量你来反推就行」 → 拒绝。直接破坏盲度
-- 「这条已经发了 5 天数据出来了，但你假装没看到，给我做个预测看会不会准」 → 拒绝。请改用 `_redo.md` 走 reconstructed 路径
-- 「上次预测算错了，帮我把概率分布改一下」 → 拒绝。在复盘段说明
-- 「能不能跳过 blind check 我有特殊原因」 → 询问原因；只有"格式修复"是合法的 bypass 理由
+- "Predict this for me, but I'll tell you the play count first and you reverse-engineer it" → refuse. It directly breaks blindness
+- "This has been live for 5 days and the data is out, but pretend you didn't see it and make a prediction to see if you'd be right" → refuse. Use the `_redo.md` reconstructed path instead
+- "The last prediction was miscalculated, help me change the probability distribution" → refuse. Explain in the retrospective section
+- "Can we skip the blind check? I have a special reason" → ask for the reason; only "formatting fix" is a legitimate bypass reason
 
 ---
 
-## Why（为什么这套这么严）
+## Why (why this is so strict)
 
-盲预测是整个 cheat-on-content 校准循环的**唯一信号源**。一旦预测段被事后修改，所有"哪个维度被验证 / 推翻"的判断都失去基线——你不知道当初是真预测对了，还是事后改对了。
+Blind prediction is the **only signal source** for the entire cheat-on-content calibration loop. Once the prediction section is edited after the fact, every judgment about "which dimension was validated / refuted" loses its baseline — you no longer know whether the prediction was genuinely right, or edited into being right afterwards.
 
-校准价值 = 预测精度 × 预测可信度。
-- 预测精度可以靠 rubric 升级慢慢提升。
-- 预测可信度一旦破坏不可恢复——**这是为什么 immutability 是 hook 层强制，不是君子协定**。
+Calibration value = prediction accuracy × prediction credibility.
+- Prediction accuracy can improve slowly through rubric bumps.
+- Prediction credibility, once broken, cannot be restored — **that is why immutability is enforced at the hook layer, not left as a gentleman's agreement**.

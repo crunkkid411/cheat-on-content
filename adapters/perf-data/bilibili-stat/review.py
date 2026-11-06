@@ -1,8 +1,8 @@
-"""发完视频后跑一次：抓 B站数据/评论 → 生成 NotebookLM 友好的 md。
+"""Run once after publishing a video: fetch Bilibili data/comments -> generate NotebookLM-friendly md.
 
-用法：
-    python review.py login                          # B站无需登录（仅为接口一致）
-    python review.py video <BV号或视频URL> [script.txt]   # 直接指定视频
+Usage:
+    python review.py login                          # Bilibili needs no login (kept for a consistent interface)
+    python review.py video <BV number or video URL> [script.txt]   # specify the video directly
 """
 from __future__ import annotations
 
@@ -23,11 +23,11 @@ def run_with_id(bvid: str, script_path: str | None) -> None:
         p = Path(script_path).expanduser()
         if p.is_file():
             script = p.read_text(encoding="utf-8", errors="ignore")
-            print(f"稿子：{p.name}（{len(script)} 字符）")
+            print(f"Script: {p.name} ({len(script)} characters)")
         else:
-            print(f"[警告] 找不到稿子 {p}")
+            print(f"[warning] Cannot find script {p}")
 
-    print(f"[抓取] 视频 {bvid}")
+    print(f"[fetch] Video {bvid}")
     result = crawler.fetch_all(bvid)
     video = result["video"]
     comments = result["comments"]
@@ -44,11 +44,11 @@ def run_with_id(bvid: str, script_path: str | None) -> None:
 
 def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == "login":
-        print("[B站] 视频数据与评论均为公开接口，无需登录，直接复盘即可。")
+        print("[Bilibili] Video data and comments are public APIs; no login needed — just run the retro.")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "video":
         if len(sys.argv) < 3:
-            print("用法：python review.py video <BV号或视频URL> [script.txt]")
+            print("Usage: python review.py video <BV number or video URL> [script.txt]")
             sys.exit(3)
         bvid = sys.argv[2]
         script_path = sys.argv[3] if len(sys.argv) > 3 else None

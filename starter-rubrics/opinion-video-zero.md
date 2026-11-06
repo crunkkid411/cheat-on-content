@@ -1,234 +1,234 @@
-# Starter Rubric：观点类视频 — v0 cold-start 占位
+# Starter Rubric: opinion video — v0 cold-start placeholder
 
-**这是给完全没数据的新博主用的占位 rubric。**它会打错。**前 5 篇预测精度大概 ±50%——这是 cold-start 的数学事实，不是 rubric 失败**。
+**This is a placeholder rubric for new creators with absolutely no data.** It will score things wrong. **Prediction accuracy for the first 5 pieces is roughly ±50% — that is a mathematical fact of cold-start, not a rubric failure.**
 
-跑完 5 篇（每篇都走完 `/cheat-predict` → 发布 → `/cheat-retro` 闭环）之后，你会有第一份个人校准数据，可以提议第一次 `/cheat-bump` 升级到 v1（或直接采用 [opinion-video.md](opinion-video.md) 的 v2 作为起点重新校准权重）。
+After running 5 pieces (each completing the `/cheat-predict` → publish → `/cheat-retro` loop), you will have your first personal calibration data and can propose the first `/cheat-bump` to v1 (or directly adopt the v2 in [opinion-video.md](opinion-video.md) as a starting point and re-calibrate the weights).
 
 ---
 
-## v0 综合分公式（**等权占位**）
+## v0 composite formula (**equal-weight placeholder**)
 
 ```
 composite = (ER + HP + QL + NA + AB + SR + SAT) / 7 × 2.0
 ```
 
-每个维度 0-5 整数分。综合分范围 0-10。
+Each dimension is an integer 0-5. The composite range is 0-10.
 
-**为什么等权而不是 v2 的差异化权重**：
-- 你**没有数据**支持任何特定权重
-- 用 v2 的权重起步会让你以为这些权重是普世的——它们不是，是参考博主账号拟合的
-- 等权能让你在数据出来之前对每个维度都给"中立的关注"
-- 第 5 篇之后你的复盘数据会告诉你哪些维度真的预测了你的账号的传播
-
----
-
-## 7 个维度
-
-### ER — Emotional Resonance（情感共鸣）
-*稿子能否在前 30 秒让观众产生一种**具体的、能命名的**情感？*
-
-- **0** — 纯信息传递；没有情感钩子
-- **3** — 一般共鸣
-- **5** — 锐利、具体、让人不太愿意承认的自我识别
-
-### HP — Hook Potential（钩子强度）
-*前 3 秒能不能逼观众看下去 30 秒？*
-
-- **0** — 通用开场（"大家好..."）
-- **3** — 具体的承诺或反直觉断言
-- **5** — 一个具体生动的场景，观众无法停止处理
-
-### QL — Quotable Lines（金句密度）
-*稿子里至少 2-3 行能被截图、能作为独立文字单独传播吗？*
-
-- **0** — 全是叙述
-- **3** — 结尾有一句令人记住的
-- **5** — 多句独立可用、分布在稿子不同位置
-
-### NA — Narrativity（叙事性）
-*有可辨识的弧线，还是平铺直叙？*
-
-- **0** — 列表式
-- **3** — 松散主线
-- **5** — 紧凑三幕结构
-
-### AB — Audience Breadth（受众广度）
-*这个议题潜在受众有多广？*
-
-- **0** — 极小众
-- **3** — 中等
-- **5** — 普世
-
-### SR — Social Resonance（社会议题共振）
-*稿子触及当下的社会模式吗？*
-
-- **0** — 纯个人 / 人际
-- **3** — 触到公认现象但没新视角
-- **5** — 命名了一个观众认识但没有语言形容的结构性模式
-
-### SAT — Satire Depth（讽刺深度）
-*稿子用了多层反讽 / 戏仿格式吗？*
-
-- **0** — 真诚直陈
-- **3** — 一层反讽
-- **5** — 嵌套或自指反讽
-
-如果你的频道走真诚路线，SAT 给 3 当占位即可。
+**Why equal weights instead of v2's differentiated weights**:
+- You **have no data** supporting any particular weight
+- Starting from v2's weights would make you think those weights are universal — they are not; they were fitted on the reference creator's account
+- Equal weights let you give each dimension "neutral attention" before the data arrives
+- After the 5th piece, your retro data will tell you which dimensions actually predict spread on your account
 
 ---
 
-## Bucket 预测：所有阶段统一格式 + 渐进信心标注
+## The 7 dimensions
 
-> 早期预测精度差是数学事实——**不通过省略 bucket 解决**，通过 **header 的 confidence 等级 + 概率分布更平**来诚实表达不确定。详见 [shared-references/prediction-anatomy.md](../shared-references/prediction-anatomy.md) 和 [state-management.md 的 confidence 表](../shared-references/state-management.md)。
+### ER — Emotional Resonance
+*Can the draft make the audience feel a **concrete, nameable** emotion within the first 30 seconds?*
+
+- **0** — Pure information transfer; no emotional hook
+- **3** — Ordinary resonance
+- **5** — Sharp, specific self-recognition that people are reluctant to admit
+
+### HP — Hook Potential
+*Can the first 3 seconds force the audience to keep watching for 30 seconds?*
+
+- **0** — Generic opening ("hello everyone...")
+- **3** — A concrete promise or counterintuitive assertion
+- **5** — A concrete, vivid scene the audience cannot stop processing
+
+### QL — Quotable Lines
+*Are there at least 2-3 lines in the draft that can be screenshotted and spread as standalone text?*
+
+- **0** — All narration
+- **3** — One memorable line at the end
+- **5** — Multiple independently usable lines, distributed across different parts of the draft
+
+### NA — Narrativity
+*Is there a recognizable arc, or is it flat exposition?*
+
+- **0** — List-like
+- **3** — A loose throughline
+- **5** — A tight three-act structure
+
+### AB — Audience Breadth
+*How broad is the potential audience for this topic?*
+
+- **0** — Very niche
+- **3** — Medium
+- **5** — Universal
+
+### SR — Social Resonance
+*Does the draft touch a current social pattern?*
+
+- **0** — Purely personal / interpersonal
+- **3** — Touches a recognized phenomenon but adds no new perspective
+- **5** — Names a structural pattern the audience recognizes but has no language for
+
+### SAT — Satire Depth
+*Does the draft use multi-layered irony / parody format?*
+
+- **0** — Sincere direct statement
+- **3** — One layer of irony
+- **5** — Nested or self-referential irony
+
+If your channel takes a sincere route, give SAT 3 as a placeholder.
+
+---
+
+## Bucket prediction: unified format at every stage + progressive confidence labeling
+
+> Poor prediction accuracy early on is a mathematical fact — **do not solve it by omitting buckets**; express uncertainty honestly through the **header's confidence level + a flatter probability distribution**. See [shared-references/prediction-anatomy.md](../shared-references/prediction-anatomy.md) and [the confidence table in state-management.md](../shared-references/state-management.md).
 >
-> calibration_samples 少时，概率分布**应该更平**（如 30/30/20/15/5 而非 5/40/45/8/2）——**这是诚实表达不确定的方式**，不是把 bucket 跳过。
+> When calibration_samples is small, the probability distribution **should be flatter** (e.g. 30/30/20/15/5 rather than 5/40/45/8/2) — **that is how you honestly express uncertainty**, not by skipping buckets.
 
-## 比率桶方案（适用所有阶段）
+## Ratio bucket scheme (applies at every stage)
 
-> ⚠️ **新人的 bucket 不能用绝对数字**——参考博主的"5w 是底部"对一个 0 粉新人来说是"现象级爆款"。
-> 如果照搬绝对数桶，你每条视频都会落"底部 99%"，bucket 失去任何排序意义。
+> ⚠️ **A newcomer's buckets cannot use absolute numbers** — the reference creator's "50k is the floor" is a "phenomenal hit" for a 0-follower newcomer.
+> If you copy absolute-number buckets, every one of your videos will land in "the bottom 99%", and buckets lose all ordering meaning.
 >
-> **比率桶**用"相对你自己上一篇的倍数"来分桶。永远适用，不管你账号多大。
+> **Ratio buckets** split by "the multiple relative to your own previous piece". They always apply, no matter how big your account is.
 
-### 第 1 篇：用平台通用默认（你还没有"上一篇"）
+### Piece 1: use platform-generic defaults (you have no "previous piece" yet)
 
-抖音 / B 站 / TikTok / YouTube 上 0 粉新人的第 1 条视频典型分布：
+The typical distribution for a 0-follower newcomer's first video on Douyin / Bilibili / TikTok / YouTube:
 
-| Bucket | 范围（**实际播放数，不是万**）| 含义 | 先验概率 |
+| Bucket | Range (**actual play count, not ten-thousands**) | Meaning | Prior probability |
 |---|---|---|---|
-| 底部 | < 100 | 几乎被算法埋了 | 30% |
-| 基础盘 | 100 - 1,000 | 完播率支撑的小推荐 | 40% |
-| 命中 | 1,000 - 10,000 | 第一次破圈的信号 | 20% |
-| 小爆 | 10,000 - 100,000 | 极罕见的"零粉首爆"| 8% |
-| 大爆 | > 100,000 | 平台算法异常加权 | 2% |
+| Floor | < 100 | Almost buried by the algorithm | 30% |
+| Base | 100 - 1,000 | Small recommendation supported by completion rate | 40% |
+| Hit | 1,000 - 10,000 | The first signal of breaking out | 20% |
+| Small hit | 10,000 - 100,000 | Extremely rare "zero-follower first hit" | 8% |
+| Big hit | > 100,000 | Abnormal algorithmic weighting | 2% |
 
-> 公众号 / Substack 把"播放"换成"阅读"，量级类似（0 粉公众号第一篇阅读 50-500 是常态）。
+> For WeChat Official Account / Substack, replace "plays" with "reads"; the magnitudes are similar (50-500 reads for a 0-follower account's first post is normal).
 
-**第 1 篇预测时**：选一个 bucket + 写概率分布。**很可能落"基础盘"**——这是数学事实，不是你失败。
+**When predicting piece 1**: pick a bucket + write the probability distribution. **It will very likely land in "Base"** — that is a mathematical fact, not your failure.
 
-### 第 2 篇起：用比率桶
+### From piece 2 on: use ratio buckets
 
-让 `baseline = 上一篇的实际播放数`（或最近 3 篇的中位数，如果有）。
+Let `baseline = the previous piece's actual plays` (or the median of the last 3, if available).
 
-| Bucket | 倍数范围 | 含义 |
+| Bucket | Multiple range | Meaning |
 |---|---|---|
-| 退步 | < 0.3 × baseline | 比上一篇明显差 |
-| 持平 | 0.3 - 1 × baseline | 与上一篇同档 |
-| 命中 | 1 - 3 × baseline | 中度突破 |
-| 小爆 | 3 - 10 × baseline | 显著破圈 |
-| 大爆 | > 10 × baseline | 量级跃迁 |
+| Regression | < 0.3 × baseline | Clearly worse than the previous piece |
+| Flat | 0.3 - 1 × baseline | Same tier as the previous piece |
+| Hit | 1 - 3 × baseline | Moderate breakthrough |
+| Small hit | 3 - 10 × baseline | Significant breakout |
+| Big hit | > 10 × baseline | Order-of-magnitude leap |
 
-**比率桶的好处**：
-- 100 → 1000 播放（10x） 与 5w → 50w 播放（10x） **是同一种成就**——比率桶都标"大爆"
-- 你的账号从 0 粉长到 10w 粉，bucket 边界自动跟着涨
-- 不需要"我今天该不该过誉这个数"——倍数是绝对的
+**Benefits of ratio buckets**:
+- 100 → 1,000 plays (10x) and 50k → 500k plays (10x) are **the same achievement** — ratio buckets both mark them "Big hit"
+- As your account grows from 0 to 100k followers, the bucket boundaries rise with it automatically
+- No need to ask "should I flatter this number today" — the multiple is absolute
 
-**例子**：
-- 第 1 篇 480 播放（落"基础盘"）→ baseline = 480
-- 第 2 篇预测 bucket = "命中"（500-1500），实际 1200 → 命中
-- 第 3 篇 baseline 滚动更新 = (480 + 1200) / 2 = 840
+**Example**:
+- Piece 1 got 480 plays (landed "Base") → baseline = 480
+- Piece 2 predicted bucket = "Hit" (500-1,500), actual 1,200 → Hit
+- Piece 3 baseline rolls forward = (480 + 1,200) / 2 = 840
 
-### 第 5 篇之后：建议固定绝对桶 + 比率桶并存
+### After piece 5: recommend fixed absolute buckets coexisting with ratio buckets
 
-跑完 5 篇后，你的 baseline 已经从 5 个数据点稳定。`/cheat-status` 会主动提示：
+After 5 pieces, your baseline has stabilized from 5 data points. `/cheat-status` proactively suggests:
 
-> 你已校准 5 篇，可以基于实际分布固定绝对 bucket 边界。
-> 跑 `/cheat-bump --bucket-only` 自动派生。
+> You have calibrated 5 pieces; you can now fix absolute bucket boundaries based on your actual distribution.
+> Run `/cheat-bump --bucket-only` to derive them automatically.
 
-固定后绝对桶用于"长期趋势识别"（这条比上个月那条好不好？），比率桶用于"近期波动"（这条比上一篇好不好？）。
+After fixing, absolute buckets are for "long-term trend identification" (is this piece better than last month's?), and ratio buckets are for "recent fluctuation" (is this piece better than the previous one?).
 
-### N≥10 之后：可以转向 percentile 桶
+### After N≥10: you can switch to percentile buckets
 
-校准池 ≥ 10 时，bucket 边界改用 percentile：你前 20% 的视频是"爆款"，10-20% 是"命中"，30-70% 是"基础盘"。这种方案永远自洽——不管账号多大，"top 20%" 的语义稳定。
-
----
-
-**重要警告**：
-- 上面的占位概率是"什么都不知道时的先验"——你的真实分布会在第 5 篇后涌现
-- 第 1-5 篇你对自己 bucket 边界的判断**会大幅波动**——这是 cold-start 的正常状态
-- 第 5 篇之后**必须**跑 `/cheat-bump --bucket-only` 重新校准
+When the calibration pool is ≥10, switch bucket boundaries to percentiles: your top 20% of videos are "breakouts", 10-20% are "hits", and 30-70% are "base". This scheme is always self-consistent — no matter how big the account, "top 20%" has a stable meaning.
 
 ---
 
-## Cold-start 战略（**必读，最被忽视的一段**）
+**Important warnings**:
+- The placeholder probabilities above are "priors when you know nothing" — your real distribution will emerge after the 5th piece
+- In pieces 1-5 your judgment of your own bucket boundaries **will fluctuate heavily** — this is the normal cold-start state
+- After the 5th piece you **must** run `/cheat-bump --bucket-only` to recalibrate
 
-cold-start 期的"预测"不是预测——是**数据采集**。理解这一点是工具是否对你有用的分水岭。
+---
 
-### 你的预测在前 5 篇做的是三件事
+## Cold-start strategy (**required reading, the most overlooked section**)
 
-1. **建立纪律**：在看到任何数据前写下盲判断。这才是脊柱——不是数字本身
-2. **记录 7 维评分**：复盘后每条样本变成一个 (打分, 实绩) 配对，第 5 篇时这些配对是 rubric 第一次升级的输入
-3. **记录锚点假设**：写下"我押 ER=5 比 ER=3 流量高"这样的假设，复盘验证 → rubric 升级的证据
+A "prediction" during cold-start is not a prediction — it is **data collection**. Understanding this is the watershed for whether the tool is useful to you.
 
-**你不应该做的事**：基于 cold-start 期的 composite 决定要不要发某条稿子。**精度 ±50%——决策没意义**。已经决定要发的，跑完整循环；正在犹豫要不要发的，靠你自己感觉。
+### What your predictions do in the first 5 pieces
 
-### 前 5 篇的取样策略：**主动选差异最大的稿子**
+1. **Build discipline**: write a blind judgment before seeing any data. That is the spine — not the numbers themselves
+2. **Record 7-dimension scores**: after the retro each sample becomes a (score, actual) pair; by the 5th piece these pairs are the input to the rubric's first upgrade
+3. **Record anchor hypotheses**: write hypotheses such as "I bet ER=5 gets more traffic than ER=3", validate them in retros → evidence for rubric upgrades
 
-如果你前 5 篇都是 `ER=5 / SR=2 / HP=5` 的同款，复盘时**你无法**告诉哪个维度真的预测了流量——多重共线性。
+**What you should not do**: decide whether to publish a draft based on a cold-start composite. **Accuracy is ±50% — the decision is meaningless**. If you have already decided to publish, run the full loop; if you are still hesitating, use your own feel.
 
-**反直觉但正确的做法**：cold-start 期主动选维度组合差异最大的样本：
-- 1 篇 ER 主导（情感向，SR 低）
-- 1 篇 SR 主导（社会议题向，ER 低）
-- 1 篇 SAT 主导（讽刺向）
-- 1 篇 QL 主导（金句密集）
-- 1 篇综合中等（all 3-4）
+### Sampling strategy for the first 5 pieces: **actively pick the most divergent drafts**
 
-如果你只有"安全的同款稿"，挑差异最大的 5 个。**稳定期再追求"全发爆款"，cold-start 期追求"信息量最大"**。
+If your first 5 pieces are all the same `ER=5 / SR=2 / HP=5` type, during retro **you cannot** tell which dimension actually predicted traffic — multicollinearity.
 
-### 何时开始相信预测
+**Counterintuitive but correct approach**: during cold-start, actively pick samples with the most divergent dimension combinations:
+- 1 ER-dominant piece (emotional, low SR)
+- 1 SR-dominant piece (social-issue, low ER)
+- 1 SAT-dominant piece (satirical)
+- 1 QL-dominant piece (dense quotable lines)
+- 1 medium all-round piece (all 3-4)
 
-| 校准样本 | 你能相信什么 |
+If you only have "safe same-type drafts", pick the 5 most divergent. **In the stable stage, pursue "publish only hits"; in cold-start, pursue "maximum information".**
+
+### When to start trusting predictions
+
+| Calibration samples | What you can trust |
 |---|---|
-| N=0-2 | 啥都别信。bucket 是占位 |
-| N=3-5 | 相信"哪个维度可能重要"的方向；不信具体 composite 数字 |
-| N=5-10 | 相信 bucket 排序；不信中枢点估计 |
-| N=10-20 | 中枢可信 ±30%；可作为决策参考之一 |
-| N≥20 | rubric 真正成为"作弊器"——但你也已经摸到自己的内容直觉了 |
+| N=0-2 | Nothing. Buckets are placeholders |
+| N=3-5 | Trust the direction of "which dimension may matter"; do not trust specific composite numbers |
+| N=5-10 | Trust bucket ordering; do not trust the center point estimate |
+| N=10-20 | The center is trustworthy to ±30%; usable as one decision reference |
+| N≥20 | The rubric truly becomes a "cheat code" — but by then you have also developed your own content intuition |
 
-**cold-start 真正的礼物不是预测精度——是它强迫你建立的复盘习惯**。这个习惯持续到 N=20 时，你的内容直觉本身就强很多了。
-
----
-
-## Cold-start 期的复盘纪律（**比稳定期更严**）
-
-前 5 篇每篇必走完整循环。**任何一篇跳过复盘 → 整个校准失败**。
-
-每次复盘必须填的最少信息：
-- 实际播放 / 阅读
-- 实际点赞数（看赞播比）
-- 实际评论数（看互动）
-- Top 3 评论 + 赞数（看观众真实的接收点）
-- 我的 v0 预测 vs 实际：哪个维度被验证 / 推翻
-
-5 篇之后你会看到至少一个 pattern——比如"我的 ER 总是高估"或"我的 SR 维度根本不预测什么"——这个 pattern 是你第一次 bump 的证据。
+**The real gift of cold-start is not prediction accuracy — it is the retro habit it forces you to build**. By the time that habit carries you to N=20, your content intuition itself will be much stronger.
 
 ---
 
-## 第 6 篇起的升级选项
+## Retro discipline during cold-start (**stricter than the stable stage**)
 
-跑完 5 篇校准后，你有 3 条路：
+Run the full loop for each of the first 5 pieces. **Skipping even one retro → the whole calibration fails**.
 
-### 路径 A：从 v0 → v1（自己拟合权重）
-跑 `/cheat-bump --propose "<你的具体权重调整>"`。系统会强制全量重打 + 跨模型审核。
+The minimum information to fill in for every retro:
+- Actual plays / reads
+- Actual like count (look at like/play ratio)
+- Actual comment count (look at interaction)
+- Top 3 comments + like counts (look at where the audience actually received it)
+- My v0 prediction vs actual: which dimension was validated / refuted
 
-### 路径 B：直接采纳 v2 作为起点
-把 [opinion-video.md](opinion-video.md) 的 v2 公式抄到你的 `rubric_notes.md`，**然后跑 `/cheat-bump`**——bump 流程会用你的 5 篇数据验证 v2 在你账号上是否真的更优。
-
-### 路径 C：保持 v0 等权，跑更多样本
-如果 5 篇还看不出明显 pattern，再跑 5 篇。等权的 v0 在 10-15 个样本之前都不丢人。
-
----
-
-## 这份 rubric 不能做的事
-
-- **不能告诉你"会不会爆"**——cold-start 期的预测置信度低，bucket 通常应给 30%-50% 而非 ≥80%
-- **不能替你设 bucket 边界**——平台 / 账号差异太大
-- **不能跨账号迁移**——同一份 v0 rubric 在不同人的账号上拟合出的 v1 不一样
+After 5 pieces you will see at least one pattern — e.g. "my ER is always overestimated" or "my SR dimension does not predict anything" — that pattern is the evidence for your first bump.
 
 ---
 
-## 最重要的一句话
+## Upgrade options from piece 6
 
-**前 5 篇你不是在做决策，你是在收集数据。**
+After 5 calibrations you have 3 paths:
 
-cold-start 期最大的诱惑是"看着 composite 8.4 就觉得这条会爆"。**别信**。8.4 是相对一份还没校准过的 rubric 算的——它对你的账号几乎没意义。第 5 篇之后再开始相信数字。
+### Path A: v0 → v1 (fit your own weights)
+Run `/cheat-bump --propose "<your specific weight adjustments>"`. The system enforces a full re-score + cross-model audit.
+
+### Path B: directly adopt v2 as a starting point
+Copy the v2 formula from [opinion-video.md](opinion-video.md) into your `rubric_notes.md`, **then run `/cheat-bump`** — the bump process uses your 5 pieces of data to validate whether v2 really is better on your account.
+
+### Path C: keep v0 equal-weight and run more samples
+If 5 pieces still show no clear pattern, run 5 more. Equal-weight v0 is not embarrassing before 10-15 samples.
+
+---
+
+## What this rubric cannot do
+
+- **It cannot tell you "whether it will blow up"** — cold-start prediction confidence is low; buckets should usually be given 30%-50%, not ≥80%
+- **It cannot set bucket boundaries for you** — platform / account differences are too large
+- **It cannot transfer across accounts** — the same v0 rubric fits different v1s on different people's accounts
+
+---
+
+## The most important sentence
+
+**For the first 5 pieces you are not making decisions; you are collecting data.**
+
+The biggest temptation during cold-start is "seeing composite 8.4 and thinking this one will blow up". **Do not believe it**. 8.4 is computed against a rubric that has not been calibrated yet — it means almost nothing for your account. Start trusting the numbers after the 5th piece.

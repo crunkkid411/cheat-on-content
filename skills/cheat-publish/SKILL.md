@@ -1,56 +1,56 @@
 ---
 name: cheat-publish
-description: 登记一篇内容已发布，把 URL/平台 ID/发布时间写入对应预测文件 header 和 state file。这是一个轻量动作——只更新元数据，**不动预测段任何字符**。触发词："已发布"/"I shipped"/"发布链接是 X"/"刚发完 [url]"/"publish registered"。
+description: Register that a piece of content has been published; write the URL / platform ID / publish time into the corresponding prediction file header and the state file. This is a lightweight action — it only updates metadata and **does not change a single character of the prediction section**. Triggers: "已发布" / "I shipped" / "发布链接是 X" / "刚发完 [url]" / "publish registered".
 argument-hint: <prediction-file-or-url> [— platform: youtube|bilibili|douyin|...]
 allowed-tools: Bash(*), Read, Edit, Glob
 ---
 
-# /cheat-publish — 发布登记
+# /cheat-publish — publish registration
 
-把作品的发布元数据（URL、发布时间、平台）补到预测文件 header 与 state file。**禁止改预测段**——hook 会拦。
+Write the work's publish metadata (URL, publish time, platform) into the prediction file header and the state file. **Changing the prediction section is forbidden** — the hook will block it.
 
 ## Overview
 
 ```
-[用户：已发布 https://...]
+[User: published https://...]
   ↓
-[Phase 0: 找到对应的预测文件]   ← 通过 in_progress_session 或匹配
+[Phase 0: find the matching prediction file]   ← via in_progress_session or matching
   ↓
-[Phase 1: 解析 URL → 平台/发布时间]
+[Phase 1: parse the URL → platform / publish time]
   ↓
-[Phase 2: 更新 prediction 文件 header（仅 metadata 段）]
+[Phase 2: update the prediction file header (metadata section only)]
   ↓
-[Phase 3: 更新 .cheat-state.json，清除 in_progress_session]
+[Phase 3: update .cheat-state.json, clear in_progress_session]
 ```
 
 ## Constants
 
-- **AUTO_DETECT_PLATFORM = true** — 从 URL 模式自动识别平台
-- **VERIFY_BLIND = true** — 提醒用户：从此刻起看到任何后续数据都会破坏盲度声明的诚信
+- **AUTO_DETECT_PLATFORM = true** — auto-detect the platform from the URL pattern
+- **VERIFY_BLIND = true** — remind the user: from this moment on, seeing any subsequent data will damage the integrity of the blind-status claim
 
 ## Inputs
 
-| 必填 | 来源 |
+| Required | Source |
 |---|---|
-| `<prediction-file>` 或 URL | 用户参数；缺失则用 `.cheat-state.json` 的 `in_progress_session.file` |
-| `.cheat-state.json` | 用户项目根 |
+| `<prediction-file>` or URL | user argument; if missing, use `in_progress_session.file` from `.cheat-state.json` |
+| `.cheat-state.json` | user project root |
 
 ## Workflow
 
-### Phase 0: 找到对应的预测文件
+### Phase 0: Find the matching prediction file
 
-按优先级：
-1. 用户参数明确给了 prediction 文件路径 → 用它
-2. 用户参数只给了 URL → 读 `.cheat-state.json` 的 `in_progress_session.file`
-3. 都没有 → 列出 `predictions/*.md` 中 header 没填 `published_at` 的文件，让用户选
+By priority:
+1. The user explicitly gave a prediction file path → use it
+2. The user gave only a URL → read `in_progress_session.file` from `.cheat-state.json`
+3. Neither → list `predictions/*.md` files whose header has no `published_at` and let the user choose
 
-**警告路径**：若 `in_progress_session.file` 与用户给的 URL 时间差超过 14 天 → 提示"这个预测写于很久之前，确认是这篇？"
+**Warning path**: if the time gap between `in_progress_session.file` and the URL the user gave exceeds 14 days → prompt "this prediction was written a long time ago; are you sure it is this one?"
 
-### Phase 1: 解析平台
+### Phase 1: Parse the platform
 
-`AUTO_DETECT_PLATFORM=true` 时按 URL 模式：
+When `AUTO_DETECT_PLATFORM=true`, by URL pattern:
 
-| URL 模式 | 平台 |
+| URL pattern | Platform |
 |---|---|
 | `youtube.com/*` `youtu.be/*` | youtube |
 | `bilibili.com/*` `b23.tv/*` | bilibili |
@@ -60,46 +60,46 @@ allowed-tools: Bash(*), Read, Edit, Glob
 | `substack.com/*` `*.substack.com/*` | substack |
 | `medium.com/*` `*.medium.com/*` | medium |
 | `twitter.com/*` `x.com/*` | twitter |
-| 其他 | unknown — 询问用户 |
+| Other | unknown — ask the user |
 
-发布时间获取：
-- 不强求自动抓——绝大多数平台需要登录态
-- 询问用户："发布时间是？（默认：现在）" → 接受 ISO 8601 或自然语言（"今天 14:30" / "20 分钟前"）
-- 解析失败 → 用 now()
+Publish time:
+- Do not insist on auto-fetching — most platforms require a logged-in session
+- Ask the user: "When was it published? (default: now)" → accept ISO 8601 or natural language ("today 14:30" / "20 minutes ago")
+- Parse failure → use now()
 
-### Phase 2: 更新 prediction 文件 header
+### Phase 2: Update the prediction file header
 
-**绝不**触碰 `## 预测` 段及之后。只动文件最顶部的 metadata 块。
+**Never** touch the `## Prediction` section (legacy `## 预测`) or anything after it. Only modify the metadata block at the very top of the file.
 
-读文件，定位到 metadata 块（在第一个 `##` 之前的所有行）。检查是否已有这些字段——有则警告"已登记过"并询问是否覆盖；无则追加：
+Read the file and locate the metadata block (all lines before the first `##`). Check whether these fields already exist — if so, warn "already registered" and ask whether to overwrite; if not, append:
 
 ```markdown
 **Published at**: 2026-05-04T14:32:00+08:00
 **Platform**: douyin
 **URL**: https://v.douyin.com/abc123
-**Video Folder**: videos/2026-05-04_a3f2c1d4_停止期待/
-**Aweme ID**: 7234567890123456789  (douyin / 视频号 等需要的 platform-specific ID)
+**Video Folder**: videos/2026-05-04_a3f2c1d4_stop-expecting/
+**Aweme ID**: 7234567890123456789  (platform-specific ID needed by douyin / WeChat Channels etc.)
 ```
 
-**关于 platform-specific ID**：
-- 抖音：从 URL 短链 resolve 后提取 `aweme_id`（v.douyin.com → 重定向后含 modal_id 或 item_id 参数）
-- B 站：BV 号
-- 小红书：note_id
-- YouTube：v= 参数后的 video_id
+**About platform-specific IDs**:
+- Douyin: resolve the short link and extract `aweme_id` (v.douyin.com → after redirect contains a modal_id or item_id parameter)
+- Bilibili: BV id
+- Xiaohongshu: note_id
+- YouTube: video_id after the v= parameter
 
-如果用户给的是分享短链（无法立刻 resolve）→ 标 `Aweme ID: pending`，下次 `/cheat-retro` 时由 adapter 解析。
+If the user gives a share short link (cannot be resolved immediately) → mark `Aweme ID: pending` and let the adapter resolve it at the next `/cheat-retro`.
 
-**video folder 处理**：到 cheat-publish 这一步，对应的 `videos/<id>/` 目录**应该已经由 cheat-shoot 创建**（含 script.md）。
+**Video folder handling**: by the time it reaches cheat-publish, the matching `videos/<id>/` directory **should already have been created by cheat-shoot** (including script.md).
 
-- 如 video folder 不存在 → 警告"你跳过了 cheat-shoot？建议先跑 cheat-shoot 把拍摄稿登记进 video folder 再发"，**询问用户是否跳过登记直接发**：
-  - 是 → 自动建一个 video folder（fallback），但不询问稿子一致性，标 `ad_hoc_publish: true`
-  - 否 → 让用户先跑 cheat-shoot 再回来 publish
+- If the video folder does not exist → warn "did you skip cheat-shoot? Suggest running cheat-shoot to register the shooting script in the video folder before publishing", and **ask the user whether to skip registration and publish directly**:
+  - Yes → auto-create a video folder (fallback), but do not ask about script consistency, and mark `ad_hoc_publish: true`
+  - No → have the user run cheat-shoot first, then come back to publish
 
-用 Edit 工具（不是 Write 重写整个文件）。
+Use the Edit tool (not Write to rewrite the whole file).
 
-**hook 行为预期**：因为只动 metadata 段（在 `## 预测` 之前），immutability hook 应放行。如果 hook 误拦 → 报告 bug，**不要绕过 hook**。
+**Expected hook behavior**: because only the metadata section is touched (before `## Prediction`), the immutability hook should let it through. If the hook falsely blocks → report a bug; **do not bypass the hook**.
 
-### Phase 3: 更新 state file
+### Phase 3: Update the state file
 
 ```json
 {
@@ -107,64 +107,64 @@ allowed-tools: Bash(*), Read, Edit, Glob
   "last_published_at": "<ISO timestamp>",
   "last_published_file": "predictions/<filename>",
   "last_published_video_folder": "videos/<...>/",
-  "last_published_platform_id": "<aweme_id 或 BV 号 等>",
+  "last_published_platform_id": "<aweme_id or BV id etc.>",
   "pending_retros": [
     "predictions/<filename>"
   ],
   "shoots": [
-    // 移除 video_folder 匹配本次发布的项；buffer -1
+    // remove the item whose video_folder matches this publish; buffer -1
   ]
 }
 ```
 
-**`shoots` 队列处理**（buffer 跟踪关键）：
-1. 读 state.shoots[]
-2. 找 `video_folder == 本次发布的 video_folder` 的项 → 移除
-3. 如果没找到 → 警告"buffer 队列里没有这条视频。是直接发布没经过 /cheat-shoot 吗？"——不阻塞，但提示用户下次走 /cheat-shoot 让 buffer 跟踪准确
+**`shoots` queue handling** (key to buffer tracking):
+1. Read state.shoots[]
+2. Find the item with `video_folder == this publish's video_folder` → remove it
+3. If not found → warn "this video is not in the buffer queue. Did you publish directly without /cheat-shoot?" — do not block, but tell the user to use /cheat-shoot next time so buffer tracking stays accurate
 
-`last_published_platform_id` 是 cheat-retro 调 adapter 时的输入——如 douyin-session 需要 aweme_id 直接抓数据。
+`last_published_platform_id` is the input cheat-retro uses when calling an adapter — e.g. douyin-session needs aweme_id to fetch data directly.
 
-`pending_retros` 是待复盘列表——`cheat-status` 会基于这个列表 + RETRO_WINDOW_DAYS 显示"今天该复盘哪些"。
+`pending_retros` is the pending-retro list — `cheat-status` uses it + RETRO_WINDOW_DAYS to show "what to retro today".
 
-### Phase 4: 提醒 + 下一步 + buffer 状态
+### Phase 4: Reminder + next steps + buffer status
 
 ```
-✅ 登记完成：predictions/2026-05-04_a3f2c1d4e5b6_停止期待.md
+✅ Registration complete: predictions/2026-05-04_a3f2c1d4e5b6_stop-expecting.md
    - Published at: 2026-05-04 14:32
    - Platform: douyin
    - URL: https://v.douyin.com/abc123
 
-📦 Buffer：N 篇（颜色 + 含义）
-   按你的 cadence（X）= N×X 天 buffer
-   [如颜色变了，提示"现在该去拍/暂停拍"]
+📦 Buffer: N pieces (color + meaning)
+   At your cadence (X) = N×X days of buffer
+   [if the color changed, prompt "time to shoot / pause shooting now"]
 
-⚠️  从此刻起，你看到任何关于这条作品的播放/点赞/评论数据
-    都会破坏盲度声明的诚信。如果不小心看到，告诉我——
-    我会在文件里追加一个 integrity warning。
+⚠️  From this moment on, any play/like/comment data you see about this work
+    will damage the integrity of the blind-status claim. If you see it accidentally,
+    tell me — I will append an integrity warning to the file.
 
-📅 计划复盘：T+3d，约 2026-05-07
-   到时间说："复盘 predictions/2026-05-04_..."
+📅 Planned retro: T+3d, around 2026-05-07
+   When the time comes, say: "retro predictions/2026-05-04_..."
 ```
 
-Buffer 颜色由 [shared-references/cadence-protocol.md](../../shared-references/cadence-protocol.md) 派生。如本次发布让 buffer 跌入红色（断更风险）→ 高亮警告"今天必须再拍 ≥1 条"。
+The buffer color is derived per [shared-references/cadence-protocol.md](../../shared-references/cadence-protocol.md). If this publish drops the buffer into red (gap risk) → highlight the warning "you must shoot ≥1 more today".
 
 ## Key Rules
 
-1. **不动预测段**。即使是修复笔误，也不允许在 publish 时改预测段
-2. **不抓数据**。publish 是登记动作，不是数据回收（那是 cheat-retro 的活）
-3. **state 字段名固定**。`pending_retros` / `last_published_at` 是其他子 skill（特别是 cheat-status / cheat-retro）依赖的契约
-4. **平台未知不强报**。无法识别 → 询问用户，允许 `platform: other` 作为兜底
-5. **重复登记需明示**。已有 published_at → 询问"覆盖？"，绝不静默覆盖
+1. **Do not touch the prediction section**. Even to fix a typo, editing the prediction section during publish is not allowed
+2. **Do not fetch data**. publish is a registration action, not data collection (that is cheat-retro's job)
+3. **State field names are fixed**. `pending_retros` / `last_published_at` are contracts other sub-skills (especially cheat-status / cheat-retro) depend on
+4. **Do not force-report an unknown platform**. If it cannot be identified → ask the user; `platform: other` is allowed as a fallback
+5. **Duplicate registration must be explicit**. If `published_at` already exists → ask "overwrite?"; never silently overwrite
 
 ## Refusals
 
-- 「我顺手把预测段也改一下」 → 拒绝。请走 `_redo.md` 路径
-- 「URL 我等会儿补，先把发布时间记上」 → 允许：URL 字段可后续追加；published_at + platform 必填
-- 「跳过 metadata 更新，直接清 in_progress_session」 → 拒绝。元数据是复盘时的关键上下文（特别是 platform 决定数据回收用哪个 adapter）
+- "Let me also tweak the prediction section while I'm here" → refuse. Use the `_redo.md` path
+- "I'll add the URL later; just record the publish time now" → allowed: the URL field can be appended later; published_at + platform are required
+- "Skip the metadata update and just clear in_progress_session" → refuse. Metadata is key context during retro (especially the platform, which decides which adapter to use for data collection)
 
 ## Integration
 
-- 上游：`/cheat-predict`（写出 prediction 文件并设 in_progress_session）
-- 下游：T+RETRO_WINDOW_DAYS 后 → `/cheat-retro`
-- `cheat-status` 用 `pending_retros` 字段计算"今天该复盘哪些"
-- 平台字段被 `cheat-retro` 用来路由到对应的 perf-data adapter（manual-paste / youtube-data-api / 等）
+- Upstream: `/cheat-predict` (writes the prediction file and sets in_progress_session)
+- Downstream: T+RETRO_WINDOW_DAYS later → `/cheat-retro`
+- `cheat-status` uses the `pending_retros` field to compute "what to retro today"
+- The platform field is used by `cheat-retro` to route to the matching perf-data adapter (manual-paste / youtube-data-api / etc.)

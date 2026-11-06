@@ -1,310 +1,310 @@
 ---
 name: cheat-bump
-description: 提议并执行 rubric 或 bucket 升级。两种模式：**完整 rubric bump**（最高风险动作，5 步强制 + 跨模型审核）和 **--bucket-only 轻量重校**（只换 bucket 边界，不动 rubric 公式）。**Phase 2 强制走 cheat-score-blind sub-agent 给校准池重打分**——不接受 self-scored fallback。触发词："升级 rubric"/"bump rubric"/"更新公式"/"我想加一个维度"/"调整权重"/"重校桶"/"recalibrate bucket"。
+description: Propose and execute a rubric or bucket upgrade. Two modes: **full rubric bump** (the highest-risk action; 5 mandatory steps + cross-model audit) and **--bucket-only lightweight recalibration** (only swaps bucket boundaries, does not touch the rubric formula). **Phase 2 mandatorily re-scores the calibration pool through the cheat-score-blind sub-agent** — self-scored fallbacks are not accepted. Triggers: "升级 rubric" / "bump rubric" / "更新公式" / "我想加一个维度" / "调整权重" / "重校桶" / "recalibrate bucket".
 argument-hint: --propose "<...>" | --bucket-only [--scheme ratio|absolute|percentile]
 allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Skill, Task, mcp__llm-chat__chat
 ---
 
-# /cheat-bump — Rubric / Bucket 升级
+# /cheat-bump — Rubric / Bucket upgrade
 
-两种模式：
+Two modes:
 
-| 模式 | 触发 | 做什么 | 验证强度 |
+| Mode | Trigger | What it does | Validation strength |
 |---|---|---|---|
-| **完整 rubric bump** | `--propose "<新公式>"` | 改公式 / 维度 / 权重 | 5 步 + 跨模型审核（强制） |
-| **bucket-only 重校** | `--bucket-only` | 只重新派生 bucket 边界 | 数据自动派生，无审核 |
+| **Full rubric bump** | `--propose "<new formula>"` | Change formula / dimensions / weights | 5 steps + cross-model audit (mandatory) |
+| **bucket-only recalibration** | `--bucket-only` | Only re-derive bucket boundaries | Automatically derived from data, no audit |
 
-完整 rubric bump 严格遵守 [shared-references/bump-validation-protocol.md](../../shared-references/bump-validation-protocol.md) 的 5 步。bucket-only 走轻量路径——见下方 Phase B。
+A full rubric bump strictly follows the 5 steps in [shared-references/bump-validation-protocol.md](../../shared-references/bump-validation-protocol.md). bucket-only takes the lightweight path — see Phase B below.
 
 ## Overview
 
 ```
-入口：用户触发 /cheat-bump
+Entry: user triggers /cheat-bump
   ↓
-[Phase A0: 检测调用模式]
+[Phase A0: detect call mode]
   ↓
-  ├─ --bucket-only  →  [Phase B: 轻量 bucket 重校]
-  └─ --propose      →  [Phase 0~6: 完整 rubric bump]
+  ├─ --bucket-only  →  [Phase B: lightweight bucket recalibration]
+  └─ --propose      →  [Phase 0~6: full rubric bump]
 ```
 
-## Phase A0: 调用模式分流（先做）
+## Phase A0: Route by call mode (do this first)
 
-读用户参数：
-- 含 `--bucket-only` → 走 **Phase B**（轻量重校）
-- 含 `--propose "<...>"` → 走 **Phase 0~8**（完整 rubric bump）
-- 都没有 → 询问用户："你想做什么？1) 调 rubric 公式 / 加减维度 → --propose；2) 只重新派生 bucket 边界 → --bucket-only"
+Read the user arguments:
+- Contains `--bucket-only` → go to **Phase B** (lightweight recalibration)
+- Contains `--propose "<...>"` → go to **Phase 0~8** (full rubric bump)
+- Neither → ask the user: "What do you want to do? 1) adjust the rubric formula / add or remove dimensions → --propose; 2) only re-derive bucket boundaries → --bucket-only"
 
-如果用户说"我觉得 ER 太低了想调"→ 是 `--propose` 路径。
-如果用户说"我账号长大了，bucket 不准了"→ 是 `--bucket-only` 路径。
-**两条路径不能混调**——一次操作只做一种事。
+If the user says "I think ER is too low, I want to adjust it" → that is the `--propose` path.
+If the user says "my account has grown and the buckets are off" → that is the `--bucket-only` path.
+**The two paths cannot be mixed** — one operation does one thing.
 
 ---
 
-## 完整 rubric bump 流程
+## Full rubric bump flow
 
 ```
-[用户：升级 rubric --propose "ER×1.5→2.0，砍 NA，加 MS"]
+[User: upgrade rubric --propose "ER×1.5→2.0, cut NA, add MS"]
   ↓
-[Phase 0: 前置门槛检查]
+[Phase 0: prerequisite gate check]
   ↓
-[Phase 1: 写出新公式完整方程]
+[Phase 1: write out the full new formula equation]
   ↓
-[Phase 2: 校准池全量重打分]
+[Phase 2: full re-score of the calibration pool]
   ↓
-[Phase 3: 计算排序一致性]
+[Phase 3: compute rank consistency]
   ↓
-[Phase 4: 跨模型独立审核（强制）]
+[Phase 4: independent cross-model audit (mandatory)]
   ↓
-[Phase 5: 落地 + cleanup pass]
+[Phase 5: land + cleanup pass]
   ↓
-[Phase 6: 更新所有校准样本的 prediction 文件底部追加 Re-scored 行]
+[Phase 6: append a Re-scored line to the bottom of every calibration sample's prediction file]
 ```
 
 ## Constants
 
 - **READINESS_HEURISTIC** —
-  - **默认参考**：校准池 ≥ 5 样本 + 至少 1 个跨样本观察有 ≥3 样本支持
-  - **但 Claude 可以提议 bump**（即使样本少）如果观察信号特别强：
-    - N=3 但出现完全推翻当前 rubric 假设的强反例（composite 8.5 vs 实绩 5w 这种 ≥3x 偏差）
-    - 1 篇出现单点但极强的现象（如评论区出现 ≥2000 赞的单一模因）
-  - **Claude 也可以拒绝 bump**（即使样本足）如果证据弱：
-    - N=10 但观察都是低置信度的零碎 pattern，无清晰方向
-    - 用户复盘时大量"随便看了下"的非严肃判断
-  - **写在 prediction header 或 cheat-bump 输出时必说明**：本次提议是 default-aligned 还是 judgment-driven，给用户审视依据
-- **THRESHOLD = 0.8** — 新排序与实绩排序一致性阈值（4/5）。这条**写死**——bump 验证的统计刚性
-- **CROSS_MODEL_AUDIT = true** — 调外部 LLM 独立审核。false 仅用于离线
-- **REQUIRE_CONFIRM = true** — 落地前要求用户明确"yes, bump"
+  - **Default reference**: calibration pool ≥ 5 samples + at least 1 cross-sample observation supported by ≥3 samples
+  - **But Claude may propose a bump** (even with few samples) if the signal is unusually strong:
+    - N=3 but a strong counterexample completely refutes the current rubric hypothesis (composite 8.5 vs actual 50k, a ≥3x miss)
+    - 1 piece shows a single-point but extremely strong phenomenon (e.g. one meme in the comments with ≥2000 likes)
+  - **Claude may also refuse a bump** (even with enough samples) if the evidence is weak:
+    - N=10 but the observations are all low-confidence fragments with no clear direction
+    - The user's retros contain many casual "I just glanced at it" non-serious judgments
+  - **When writing the prediction header or the cheat-bump output, always state**: whether this proposal is default-aligned or judgment-driven, so the user has a basis to review it
+- **THRESHOLD = 0.8** — consistency threshold between the new ranking and the actual-performance ranking (4/5). This is **hardcoded** — the statistical rigidity of bump validation
+- **CROSS_MODEL_AUDIT = true** — call an external LLM for independent audit. false only for offline use
+- **REQUIRE_CONFIRM = true** — require the user to explicitly say "yes, bump" before landing
 
 ## Inputs
 
-| 必填 | 来源 |
+| Required | Source |
 |---|---|
-| `--propose` 文本 | 用户参数；缺失则询问 |
-| `rubric_notes.md` | 用户项目根 |
-| `predictions/*.md` 全量 | 校准池数据 |
-| `.cheat-state.json` | 状态 |
+| `--propose` text | user argument; ask if missing |
+| `rubric_notes.md` | user project root |
+| All `predictions/*.md` | calibration-pool data |
+| `.cheat-state.json` | state |
 
 ## Workflow
 
-### Phase 0: 前置门槛检查
+### Phase 0: Prerequisite gate check
 
-按 [bump-validation-protocol.md](../../shared-references/bump-validation-protocol.md) 的"何时禁止"段，逐项检查：
+Following the "when it is forbidden" section of [bump-validation-protocol.md](../../shared-references/bump-validation-protocol.md), check each item:
 
-| 检查 | 失败处理 |
+| Check | Failure handling |
 |---|---|
-| 校准池总样本数 vs 观察强度 | **Claude 判断**——按 READINESS_HEURISTIC：默认 ≥5 样本但允许特例（强反例 / 强模因）。如不满足默认，Claude 必须**显式说明**为什么仍然提议 bump（"虽然只 N=3 样本，但 X 这条出现 composite Y vs 实绩 Z，这是 W 倍偏差"），让用户审视 |
-| 上次 bump 距今的新校准数 vs 观察成熟度 | **Claude 判断**——默认建议 ≥3 篇新样本，但如果连续 3 篇都强证据指向同一方向 → 不必再等 |
-| `in_progress_session == null` | 拒绝："你有 in-progress 预测未完成。先走完那条流程或清掉 state" |
-| 触发条件成立（系统性偏差 / 跨样本新观察 / 新维度证据足） | 警告但不阻塞——询问用户为什么现在 bump |
+| Calibration-pool sample count vs observation strength | **Claude judges** — per READINESS_HEURISTIC: default ≥5 samples but exceptions allowed (strong counterexample / strong meme). If below the default, Claude must **explicitly explain** why it still proposes a bump ("although N=3, piece X shows composite Y vs actual Z, a W-fold miss"), so the user can review it |
+| New calibrations since the last bump vs observation maturity | **Claude judges** — default recommends ≥3 new samples, but if 3 consecutive pieces all strongly point the same way → no need to wait |
+| `in_progress_session == null` | Refuse: "You have an in-progress prediction. Finish that flow first or clear the state" |
+| Trigger conditions hold (systematic deviation / cross-sample new observation / enough new-dimension evidence) | Warn but do not block — ask the user why they want to bump now |
 
-通过 → 进入 Phase 1。
+Pass → go to Phase 1.
 
-### Phase 1: 写出新公式完整方程
+### Phase 1: Write out the full new formula equation
 
-**不能只接受用户的简短描述**。把它展开为完整方程：
+**Do not accept the user's short description alone**. Expand it into a full equation:
 
 ```
-当前：v2  composite = (ER×1.5 + SR×1.5 + HP×1.5 + QL + NA + AB + SAT) / 8.5 × 2.0
-提议：v2.1  composite = (ER×2.0 + HP×1.5 + MS×1.5 + QL + SR + TS + SAT) / 9.0 × 2.0
+Current: v2  composite = (ER×1.5 + SR×1.5 + HP×1.5 + QL + NA + AB + SAT) / 8.5 × 2.0
+Proposed: v2.1  composite = (ER×2.0 + HP×1.5 + MS×1.5 + QL + SR + TS + SAT) / 9.0 × 2.0
 
-变化总结：
-- ER ×1.5 → ×2.0（升）
-- SR ×1.5 → ×1.0（降）
-- 新增 MS ×1.5（Memetic Shareability）
-- 新增 TS ×1.0（Topic Shareability）
-- 删除 NA（与 HP 重叠）
-- 删除 AB（被 TS 替代）
-- 归一化常数 8.5 → 9.0
-- 公式总维度数：7 → 7（净变化 0）
+Change summary:
+- ER ×1.5 → ×2.0 (up)
+- SR ×1.5 → ×1.0 (down)
+- Added MS ×1.5 (Memetic Shareability)
+- Added TS ×1.0 (Topic Shareability)
+- Removed NA (overlaps with HP)
+- Removed AB (replaced by TS)
+- Normalization constant 8.5 → 9.0
+- Total dimension count: 7 → 7 (net change 0)
 ```
 
-如果用户的提议含糊（如"ER 权重提一点"）→ 询问具体数值，**禁止自己猜**。
+If the user's proposal is vague (e.g. "raise the ER weight a bit") → ask for the specific number; **do not guess**.
 
-### Phase 2: 校准池全量重打分（**强制走 blind sub-agent**）
+### Phase 2: Full re-score of the calibration pool (**mandatorily through the blind sub-agent**)
 
-Glob `predictions/*.md` 中所有有完整复盘段的文件 → 校准池。
+Glob every `predictions/*.md` file with a complete retrospective section → the calibration pool.
 
-**bump 是工具最高风险动作——所有重打必须走 [cheat-score-blind](../cheat-score-blind/SKILL.md) sub-agent**。inline 重打 = 主 Claude 已经看过实绩，rank 一致性变成 overfit 而非真信号。
+**A bump is the tool's highest-risk action — all re-scoring must go through the [cheat-score-blind](../cheat-score-blind/SKILL.md) sub-agent**. Inline re-scoring = the main Claude has already seen the actual performance, and rank consistency becomes overfitting instead of a real signal.
 
-#### 强制约束
+#### Mandatory constraints
 
-- **不接受 self-scored fallback**——`/cheat-predict` 有 `--skip-blind` flag，但 `/cheat-bump` **没有**。如果 Task tool 不可用 → **abort bump**，向用户报告"先解决 Task tool 再 bump"
-- **不接受"我只重算 composite 不重打 dim"** —— 即使新公式只调权重不加维度，每条 prediction 的所有 dim 都要由 sub-agent 重新审 script。理由：旧 dim 分本身可能是污染的；权重变了不能保证旧 dim 还成立
+- **No self-scored fallback is accepted** — `/cheat-predict` has a `--skip-blind` flag, but `/cheat-bump` **does not**. If the Task tool is unavailable → **abort the bump** and report "resolve the Task tool before bumping"
+- **"I'll only recompute the composite, not re-score the dims" is not accepted** — even if the new formula only adjusts weights and adds no dimensions, every dim of every prediction must be re-examined against the script by the sub-agent. Reason: the old dim scores themselves may be contaminated; a weight change does not guarantee the old dims still hold
 
-#### 对每篇 prediction：
+#### For each prediction:
 
-1. 解析 prediction 文件拿到对应 `scripts/<id>.md` 路径（从 `Script Path` header 字段）
-2. 校验 script 文件存在 + hash 跟 header `Script Hash` 一致；不一致 → 警告（script 改过了）但仍 spawn sub-agent
-3. **通过 Task tool spawn cheat-score-blind sub-agent**：
+1. Parse the prediction file to get the matching `scripts/<id>.md` path (from the `Script Path` header field)
+2. Validate that the script file exists + its hash matches the header `Script Hash`; mismatch → warn (the script has changed) but still spawn the sub-agent
+3. **Spawn the cheat-score-blind sub-agent via the Task tool**:
    ```
    Spawn cheat-score-blind sub-agent.
 
    Input:
-     script_path: <prediction header 的 Script Path>
+     script_path: <Script Path from the prediction header>
      rubric_notes_path: rubric_notes.md
      sidecar_path: .cheat-cache/bump-rescores/<prediction-id>.json
 
-   Task: 按 rubric_notes 当前公式（已是新版 vN+1）给 script 打分。
-   返回严格 JSON。写 sidecar 文件用于 bump 主流程批量读取。
+   Task: score the script according to the current formula in rubric_notes (already the new version vN+1).
+   Return strict JSON. Write the sidecar file so the main bump flow can read it in bulk.
 
-   不要读 state file / predictions/ / videos/ 任何其他文件。
-   不要询问用户 —— 你没有用户。
-   不要读这份 prediction 文件本身 —— 你只看 script + rubric。
+   Do not read the state file / predictions/ / videos/ or any other file.
+   Do not ask the user anything — you have no user.
+   Do not read this prediction file itself — you only look at the script + rubric.
    ```
-4. 等 sub-agent 完成 → 读 sidecar JSON → 主流程用新公式算 composite
-5. 写"重打表"到 `.cheat-cache/bump-rescores.json`（汇总）。**每条 entry 标 `blind: true`** —— bump phase 5 cleanup 时把这个字段连同新分数写到 prediction 文件的 `Re-scored under v<N+1>` 行
+4. Wait for the sub-agent to finish → read the sidecar JSON → the main flow computes the composite with the new formula
+5. Write the "re-score table" to `.cheat-cache/bump-rescores.json` (summary). **Mark every entry `blind: true`** — during the Phase 5 cleanup, write this field along with the new score into the prediction file's `Re-scored under v<N+1>` line
 
-#### 还污染没污染的诚实标注
+#### Honest labeling of residual contamination
 
-即使走 sub-agent，**仍有两类残余 contamination 要在 bump report 里诚实标注**：
+Even with the sub-agent, **two kinds of residual contamination must be honestly labeled in the bump report**:
 
-| 类型 | 来源 | 标注字段 |
+| Type | Source | Label field |
 |---|---|---|
-| 模型 prior contamination | sub-agent 仍是 Claude，RLHF 共享 | `model_prior_warning: true`（默认 true，不可关） |
-| 用户自己 rubric design bias | rubric_notes.md 是用户写的，自然 fit 自己内容 | `rubric_self_designed: true`（默认 true，不可关） |
+| Model prior contamination | The sub-agent is still Claude; shared RLHF | `model_prior_warning: true` (default true, cannot be turned off) |
+| The user's own rubric design bias | rubric_notes.md was written by the user and naturally fits their own content | `rubric_self_designed: true` (default true, cannot be turned off) |
 
-这两条提示用户 channel C（跨模型 audit）的不可省。bump 报告末尾必印："上面的 rank 一致性是 channel A 内的一致性。**最终决策必须等 channel C audit 通过**。"
+These two remind the user that channel C (cross-model audit) cannot be skipped. The end of every bump report must print: "The rank consistency above is consistency within channel A. **The final decision must wait for channel C audit to pass**."
 
-#### 失败模式
+#### Failure modes
 
-| 症状 | 处理 |
+| Symptom | Handling |
 |---|---|
-| 某条 prediction 的 script 文件不见了 | sub-agent skip 该条，主流程汇总报告"N 条因 script 缺失被排除"。如剩余有效池 < MIN_SAMPLES → abort bump |
-| sub-agent 返回 `refusal != null` | 重发 Task 最多 3 次；仍败 → 该条标 `rescore_failed: true` 排除出校准池 |
-| Task tool 整个不可用 | abort bump，提示用户"Task tool 是 bump 的硬依赖。如真的离线环境，跑 `/cheat-bump --bucket-only` 走轻量分支" |
-| sub-agent 输出含 contamination_signal | 标 `suspicious: true` 但不排除——bump report 末尾列这些可疑条目让用户审 |
+| A prediction's script file is missing | The sub-agent skips that entry; the main flow's summary reports "N entries excluded due to missing scripts". If the remaining valid pool < MIN_SAMPLES → abort the bump |
+| The sub-agent returns `refusal != null` | Resend the Task up to 3 times; still failing → mark that entry `rescore_failed: true` and exclude it from the calibration pool |
+| The Task tool is entirely unavailable | Abort the bump and tell the user "the Task tool is a hard dependency of bump. If you are truly offline, run `/cheat-bump --bucket-only` for the lightweight branch" |
+| The sub-agent output contains contamination_signal | Mark `suspicious: true` but do not exclude — list these suspicious entries at the end of the bump report for the user to review |
 
-### Phase 3: 计算排序一致性
+### Phase 3: Compute rank consistency
 
 ```
-每个样本：
-  new_composite_rank: 用新公式排序的 rank
-  actual_plays_rank: 用实际播放排序的 rank
+For each sample:
+  new_composite_rank: rank when sorted by the new formula
+  actual_plays_rank: rank when sorted by actual plays
   delta: |new_rank - actual_rank|
 
-输出对照表：
-| 样本 | composite (v2) | composite (v2.1) | rank (new) | actual | rank (actual) | delta |
+Output comparison table:
+| Sample | composite (v2) | composite (v2.1) | rank (new) | actual | rank (actual) | delta |
 |---|---|---|---|---|---|---|
-| 仓鼠 | 9.41 | 9.55 | 1 | 124.8w | 1 | 0 |
-| 停止期待 | 8.24 | 9.11 | 2 | 71.1w | 2 | 0 |
-| 老板废话 | 7.65 | 8.11 | 4 | 39.6w | 3 | 1 |
-| 求职悖论 | 8.47 | 7.56 | 5 | 16.8w | 4 | 1 |
-| 谁问你了 | 8.24 | 7.00 | 6 | 11.7w | 5 | 1 |
+| Hamster | 9.41 | 9.55 | 1 | 1.248M | 1 | 0 |
+| Stop expecting | 8.24 | 9.11 | 2 | 711k | 2 | 0 |
+| Boss nonsense | 7.65 | 8.11 | 4 | 396k | 3 | 1 |
+| Job-hunting paradox | 8.47 | 7.56 | 5 | 168k | 4 | 1 |
+| Who asked you | 8.24 | 7.00 | 6 | 117k | 5 | 1 |
 
-排序一致性：4/5 在 |delta| ≤ 1
-Pairwise no-regression：旧公式做对的所有 pair 在新公式下未颠倒 ✓
+Rank consistency: 4/5 within |delta| ≤ 1
+Pairwise no-regression: every pair the old formula got right is not reversed under the new formula ✓
 ```
 
-判定：
-- 排序一致性 < THRESHOLD（默认 0.8） → **本地拒绝**，转 Phase 4 之前明确报告失败
-- pairwise 出现回归 → **本地拒绝**
+Decision:
+- Rank consistency < THRESHOLD (default 0.8) → **local reject**; report the failure clearly before Phase 4
+- Any pairwise regression → **local reject**
 
-`THRESHOLD` 写死在协议里——不允许临时调低（那本身是另一个需要 bump 的元决策）。
+`THRESHOLD` is hardcoded in the protocol — it may not be lowered ad hoc (that itself is another meta-decision that needs a bump).
 
-### Phase 4: 跨模型独立审核（**强制**，除非 escape hatch）
+### Phase 4: Independent cross-model audit (**mandatory**, unless the escape hatch applies)
 
-`CROSS_MODEL_AUDIT=true`（默认）：
+`CROSS_MODEL_AUDIT=true` (default):
 
-调用 `mcp__llm-chat__chat`：
+Call `mcp__llm-chat__chat`:
 
 ```
 prompt:
-你是一个独立审稿人。下面是一个内容创作者准备升级的 rubric 公式。
-请独立判定两件事：
-1. 排序一致性：新公式给样本的排序与实际表现排序，是否真的在 ≥80% 样本上一致？
-2. 解释力：新公式相比旧公式，是否更好地解释了校准池的实绩分布？
+You are an independent reviewer. Below is a rubric formula a content creator is about to upgrade.
+Independently judge two things:
+1. Rank consistency: does the new formula's ordering of the samples really agree with the actual-performance ordering on ≥80% of samples?
+2. Explanatory power: compared with the old formula, does the new formula explain the calibration pool's actual-performance distribution better?
 
-数据：
-旧公式：(ER×1.5 + SR×1.5 + HP×1.5 + QL + NA + AB + SAT) / 8.5 × 2.0
-新公式：(ER×2.0 + HP×1.5 + MS×1.5 + QL + SR + TS + SAT) / 9.0 × 2.0
+Data:
+Old formula: (ER×1.5 + SR×1.5 + HP×1.5 + QL + NA + AB + SAT) / 8.5 × 2.0
+New formula: (ER×2.0 + HP×1.5 + MS×1.5 + QL + SR + TS + SAT) / 9.0 × 2.0
 
-校准池：
-[Phase 2 重打表的完整 JSON]
+Calibration pool:
+[complete JSON of the Phase 2 re-score table]
 
-排序对照：
-[Phase 3 表格的完整 JSON]
+Rank comparison:
+[complete JSON of the Phase 3 table]
 
-输出格式：
-- 判定：PASS 或 REJECT
-- 理由：≥100 字
-- 关键风险：[如有，列出新公式的潜在问题]
+Output format:
+- Verdict: PASS or REJECT
+- Reason: ≥100 words
+- Key risk: [if any, list potential problems with the new formula]
 ```
 
-收到外部 LLM 回复 → 解析判定。
+Receive the external LLM reply → parse the verdict.
 
-判定逻辑：
-- 本地 PASS + 外部 PASS → 通过，进入 Phase 5
-- 本地 PASS + 外部 REJECT → **视为 REJECT**。冲突意味着至少一方解读不稳定
-- 本地 REJECT → 已在 Phase 3 终止
-- mcp__llm-chat__chat 不可用 → 优雅降级到 `CROSS_MODEL_AUDIT=false`，state file 标 `last_bump_self_audited: true`
+Decision logic:
+- Local PASS + external PASS → pass, go to Phase 5
+- Local PASS + external REJECT → **treat as REJECT**. A conflict means at least one side's reading is unstable
+- Local REJECT → already terminated in Phase 3
+- `mcp__llm-chat__chat` unavailable → degrade gracefully to `CROSS_MODEL_AUDIT=false`, state file marked `last_bump_self_audited: true`
 
-`CROSS_MODEL_AUDIT=false`：
-- 仅依赖本地判定
-- state file 持续标记，cheat-status 持续提示用户"这次 bump 是自审，建议配置 mcp__llm-chat__chat"
+`CROSS_MODEL_AUDIT=false`:
+- Rely on local judgment only
+- Keep the state file marked; cheat-status keeps telling the user "this bump was self-audited; configuring mcp__llm-chat__chat is recommended"
 
-### Phase 5: 落地 + cleanup pass
+### Phase 5: Land + cleanup pass
 
-通过审核后，**REQUIRE_CONFIRM=true** → 询问用户："新公式 PASS 本地与外部审核。最后确认：执行 bump 落地？这会修改 rubric_notes.md + rubric-memo.md 并删除若干已被吸收的观察。回答 'yes, bump' 才执行。"
+After the audit passes, **REQUIRE_CONFIRM=true** → ask the user: "The new formula PASSED both local and external audit. Final confirmation: execute the bump? This will modify rubric_notes.md + rubric-memo.md and delete several absorbed observations. Answer 'yes, bump' to execute."
 
-用户确认后：
+After the user confirms:
 
-#### 5a. 更新 `rubric_notes.md`（**只放通用语言，不含视频名 / 实绩**）
+#### 5a. Update `rubric_notes.md` (**generic language only; no video names / actual performance**)
 
-- 顶部 metadata 更新：
-  - `**当前版本**: vN+1`
+- Update the top metadata:
+  - `**Current version**: vN+1`
   - `**Last bumped at**: <ISO 8601>`
-  - `**Upgrade memos**: 见 [rubric-memo.md](rubric-memo.md)`（指针，不复制 Memo 内容）
-- 版本速查表加一行（只含版本号 + 公式签名，**不含**证据样本）
-- 更新"当前评分维度"段（删 NA / AB，加 MS / TS）
-- **派生证据段** 如新维度需要锚点解释 → **用通用语言**：
-  - ✅ 允许：「派生证据：高抽象密度样本 → CC=1 → 低 reach」
-  - ❌ 禁止：「派生证据：「停止期待」CC=1 → 实绩 13.7w」（视频名 + 实绩 数字）
-  - 命中违禁 pattern → 把该段抽到 rubric-memo.md 的"派生证据"子段，原位用通用语言替代
+  - `**Upgrade memos**: see [rubric-memo.md](rubric-memo.md)` (a pointer; do not copy memo content)
+- Add a row to the version quick-reference table (version number + formula signature only, **not** evidence samples)
+- Update the "Current scoring dimensions" section (remove NA / AB, add MS / TS)
+- **Derived-evidence section** — if the new dimension needs an anchor explanation → **use generic language**:
+  - ✅ Allowed: "Derived evidence: high-abstraction-density sample → CC=1 → low reach"
+  - ❌ Forbidden: "Derived evidence: 'Stop expecting' CC=1 → actual 137k" (video name + actual-performance numbers)
+  - If a forbidden pattern hits → move that passage into the "derived evidence" subsection of rubric-memo.md and replace it in place with generic language
 
-#### 5b. 写 Memo 到 `rubric-memo.md`（**append 模式，不覆盖历史**）
+#### 5b. Write the memo into `rubric-memo.md` (**append mode; do not overwrite history**)
 
-按 [bump-validation-protocol.md](../../shared-references/bump-validation-protocol.md) Step 5 + [templates/rubric-memo.template.md](../../templates/rubric-memo.template.md) 格式 append 一段 Memo 到文件末尾：
+Following [bump-validation-protocol.md](../../shared-references/bump-validation-protocol.md) Step 5 + the [templates/rubric-memo.template.md](../../templates/rubric-memo.template.md) format, append a memo section to the end of the file:
 
-- 触发观察（含真实观察 ID）
-- 证据数据（**校准池重打表 + 排序对照，含真实视频名 + 实绩**）
-- 派生证据（**含真实样本名 + 实绩**）
-- 诊断
-- 新公式
-- 跨模型审核结论引用（含模型名 + 判定 + 理由摘录）
-- 已知局限
+- Triggering observations (with real observation IDs)
+- Evidence data (**calibration-pool re-score table + rank comparison, including real video names + actual performance**)
+- Derived evidence (**including real sample names + actual performance**)
+- Diagnosis
+- New formula
+- Cross-model audit conclusion citation (including model name + verdict + reason excerpt)
+- Known limitations
 
-**绝不**覆盖 rubric-memo.md 已有内容——bump memo 按时间顺序累积。
+**Never** overwrite existing content in rubric-memo.md — bump memos accumulate chronologically.
 
-#### 5c. cleanup pass（按 [observation-lifecycle.md](../../shared-references/observation-lifecycle.md) 的"cleanup pass 强制时机"）
+#### 5c. cleanup pass (per the "mandatory cleanup-pass timing" in [observation-lifecycle.md](../../shared-references/observation-lifecycle.md))
 
-在 `rubric_notes.md` 内执行（**不**动 rubric-memo.md）：
+Execute inside `rubric_notes.md` (**do not** touch rubric-memo.md):
 
-- 已被吸收为新维度的观察 → 删（如观察 E 被吸收为 MS → 删观察 E）
-- 被新数据推翻的观察 → 删
-- 仍未解决的观察 → 迁移到新版本"待验证假设"段
-- 已被验证的"规律"→ 移到"规律沉淀区"
+- Observations absorbed into a new dimension → delete (e.g. observation E absorbed as MS → delete observation E)
+- Observations refuted by new data → delete
+- Still-unresolved observations → move to the new version's "Hypotheses to verify" section
+- Validated "rules" → move to the "Settled rules" section
 
-#### 5d. 整理 + 自检
+#### 5d. Tidy + self-audit
 
-- 重新读 `rubric_notes.md` 全文，确保读者能在 60 秒内理解当下规则——超出 600 行触发额外清算
-- **自检 leak guard**：对 `rubric_notes.md` 跑 `grep -E '\\d+\\s*[wWmMkK万]|播放|实绩|实际'` → 如有命中 → **abort bump + 回滚**，提示用户"rubric_notes.md 写入了违禁内容（实绩 / 播放数）"。这些内容应在 rubric-memo.md，不在 rubric_notes.md
+- Re-read the full `rubric_notes.md` and make sure a reader can understand the current rules within 60 seconds — over 600 lines triggers an extra cleanup
+- **Self-audit leak guard**: run `grep -E '\d+\s*[wWmMkK万]|播放|实绩|实际'` against `rubric_notes.md` → if anything hits → **abort the bump + roll back**, telling the user "rubric_notes.md contains forbidden content (actual performance / play counts)". Such content belongs in rubric-memo.md, not rubric_notes.md
 
-### Phase 6: 校准样本批量更新
+### Phase 6: Batch-update calibration samples
 
-对每个校准样本的 prediction 文件，**底部追加**（不动预测段、不动复盘段）：
+For every calibration sample's prediction file, **append at the bottom** (do not touch the prediction section, do not touch the retrospective section):
 
 ```markdown
 
 ---
 **Re-scored under v2.1 on 2026-05-04**: composite=8.24 → 9.11 (blind: true)
-（rubric bump 时全量重算，由 cheat-score-blind sub-agent 独立打分；详见 rubric-memo.md 的 v2 → v2.1 升级 Memo）
+(recomputed in full at rubric bump time by the cheat-score-blind sub-agent independently; see the v2 → v2.1 upgrade memo in rubric-memo.md)
 ```
 
-`blind: true` 字段**必填**——告诉未来读这条记录的人"这是 channel B 隔离打分，不是主 Claude 自评"。如果某条 prediction 在 Phase 2 因 sub-agent 失败被排除 → 不会有 Re-scored 行（保持原样）。
+The `blind: true` field is **required** — it tells future readers of this record "this is channel B isolated scoring, not the main Claude's self-estimate". If a prediction was excluded in Phase 2 due to a sub-agent failure → it gets no Re-scored line (stays as-is).
 
-用 Edit 工具，匹配每个文件的最末尾。
+Use the Edit tool, matching the very end of each file.
 
-### Phase 7: 更新 state file
+### Phase 7: Update the state file
 
 ```json
 {
@@ -316,162 +316,162 @@ prompt:
 }
 ```
 
-清空 `consecutive_directional_errors`——新 rubric 重新计数。
+Clear `consecutive_directional_errors` — the new rubric starts counting again.
 
-### Phase 8: 控制台报告
+### Phase 8: Console report
 
 ```
-✅ Rubric 已升级 v2 → v2.1
+✅ Rubric upgraded v2 → v2.1
 
-变化：
+Changes:
 - ER ×1.5 → ×2.0
 - SR ×1.5 → ×1.0
-- 新增 MS / TS
-- 删除 NA / AB
+- Added MS / TS
+- Removed NA / AB
 
-校准池重打：5/5 通过排序检查（4/5 一致 + 0 pairwise 回归）
-跨模型审核：✅ PASS
-Cleanup pass：删除观察 D 和 E（已吸收为 QL 重定义和 MS 维度）
+Calibration-pool re-score: 5/5 passed the rank check (4/5 consistent + 0 pairwise regressions)
+Cross-model audit: ✅ PASS
+Cleanup pass: deleted observations D and E (absorbed into the QL redefinition and the MS dimension)
 
-下一篇预测起按 v2.1 公式打分。
-所有历史预测文件已追加 Re-scored 标记。
+The next prediction is scored under the v2.1 formula.
+All historical prediction files have a Re-scored marker appended.
 ```
 
 ---
 
-## Phase B：bucket-only 重校（轻量分支）
+## Phase B: bucket-only recalibration (lightweight branch)
 
 `/cheat-bump --bucket-only [--scheme ratio|absolute|percentile]`
 
-**与完整 bump 的本质区别**：bucket 边界不是规则的一部分，是数据派生量。重新派生它**不需要跨模型审核**——派生算法是确定性的，没有"判断"成分。
+**The essential difference from a full bump**: bucket boundaries are not part of the rules; they are a data-derived quantity. Re-deriving them **does not need a cross-model audit** — the derivation algorithm is deterministic and has no "judgment" component.
 
-### B1: 选择算法（按可用样本数自动派生，**state 不存 scheme**）
+### B1: Choose the algorithm (auto-derived from the available sample count; **state does not store the scheme**)
 
-| 算法 | 适用 | 边界派生方式 |
+| Algorithm | Applies | Boundary derivation |
 |---|---|---|
-| `ratio`（默认 N=1-4） | 小样本 | 上一篇 / 最近 3 篇中位数 × {0.3 / 1 / 3 / 10 / 30} |
-| `absolute`（默认 N=5-9）| 中等样本 | 校准池中位数 × {0.3 / 1 / 3 / 10 / 30}，固定边界 |
-| `percentile`（默认 N≥10）| 大样本 | 校准池实绩 percentile {30 / 60 / 85 / 95 / 100} |
+| `ratio` (default N=1-4) | Small samples | Previous piece / median of the last 3 × {0.3 / 1 / 3 / 10 / 30} |
+| `absolute` (default N=5-9) | Medium samples | Calibration-pool median × {0.3 / 1 / 3 / 10 / 30}, fixed boundaries |
+| `percentile` (default N≥10) | Large samples | Calibration-pool actual-performance percentiles {30 / 60 / 85 / 95 / 100} |
 
-`--scheme` 参数允许用户**显式覆盖默认**：
-- `--scheme ratio` 强制用 ratio（即使 N≥5）
-- `--scheme absolute` 强制用 absolute
-- `--scheme percentile` 强制用 percentile（要求 N≥3，否则报错）
+The `--scheme` parameter lets the user **explicitly override the default**:
+- `--scheme ratio` forces ratio (even when N≥5)
+- `--scheme absolute` forces absolute
+- `--scheme percentile` forces percentile (requires N≥3, otherwise error)
 
-未指定 `--scheme` → 按上表自动派生。
+No `--scheme` specified → auto-derive per the table above.
 
-> 旧设计有 `bucket_scheme` state 字段——v1.1 删了。所有 skill 实时按 calibration_samples 派生算法，不需要持久化"当前用哪个"。这避免了"切换 scheme 后忘了同步"的状态不一致问题。
+> The old design had a `bucket_scheme` state field — removed in v1.1. Every skill derives the algorithm live from calibration_samples and does not need to persist "which one is current". This avoids the "forgot to sync after switching schemes" state-inconsistency problem.
 
-### B2: 派生新边界
+### B2: Derive the new boundaries
 
-读 `predictions/*.md` 中所有有 `actual_plays` 的样本。
+Read every sample in `predictions/*.md` that has `actual_plays`.
 
-**ratio 模式**：
+**ratio mode**:
 ```
-baseline = median(最近 3 篇 actual_plays)
+baseline = median(last 3 actual_plays)
 buckets = {
-  "退步": (-inf, baseline * 0.3),
-  "持平": (baseline * 0.3, baseline * 1),
-  "命中": (baseline * 1, baseline * 3),
-  "小爆": (baseline * 3, baseline * 10),
-  "大爆": (baseline * 10, +inf),
+  "Regression": (-inf, baseline * 0.3),
+  "Flat": (baseline * 0.3, baseline * 1),
+  "Hit": (baseline * 1, baseline * 3),
+  "Small hit": (baseline * 3, baseline * 10),
+  "Big hit": (baseline * 10, +inf),
 }
 ```
 
-**absolute 模式**：
+**absolute mode**:
 ```
-baseline = median(全部校准池 actual_plays)
+baseline = median(all calibration-pool actual_plays)
 buckets = {
-  "底部": (-inf, baseline * 0.3),
-  "基础盘": (baseline * 0.3, baseline * 1),
-  "命中": (baseline * 1, baseline * 3),
-  "爆款": (baseline * 3, baseline * 10),
-  "现象级": (baseline * 10, +inf),
+  "Floor": (-inf, baseline * 0.3),
+  "Base": (baseline * 0.3, baseline * 1),
+  "Hit": (baseline * 1, baseline * 3),
+  "Breakout": (baseline * 3, baseline * 10),
+  "Phenomenal": (baseline * 10, +inf),
 }
 ```
 
-**percentile 模式**：
+**percentile mode**:
 ```
-sorted_plays = sorted(全部校准池 actual_plays)
+sorted_plays = sorted(all calibration-pool actual_plays)
 buckets = {
-  "底部":   ≤ p30,
-  "基础盘": p30 - p60,
-  "命中":   p60 - p85,
-  "小爆":   p85 - p95,
-  "大爆":   ≥ p95,
+  "Floor":   ≤ p30,
+  "Base":    p30 - p60,
+  "Hit":     p60 - p85,
+  "Small hit":   p85 - p95,
+  "Big hit":   ≥ p95,
 }
 ```
 
-### B3: 报告变化 + 用户确认
+### B3: Report the changes + user confirmation
 
 ```
-当前 bucket scheme: ratio
+Current bucket scheme: ratio
 proposed scheme: absolute
-baseline: 4.2w 中位数（基于 5 篇校准样本）
+baseline: 42k median (based on 5 calibration samples)
 
-新边界：
-- 底部:   < 1.3w
-- 基础盘: 1.3w - 4.2w
-- 命中:   4.2w - 12.6w
-- 爆款:   12.6w - 42w
-- 现象级: > 42w
+New boundaries:
+- Floor:   < 13k
+- Base:    13k - 42k
+- Hit:     42k - 126k
+- Breakout:   126k - 420k
+- Phenomenal: > 420k
 
-派生说明：
-- 5 篇实绩：1.5w / 3.8w / 4.2w / 5.6w / 18w
-- 中位数 4.2w，新桶按 ×{0.3, 1, 3, 10} 派生
+Derivation notes:
+- 5 actuals: 15k / 38k / 42k / 56k / 180k
+- Median 42k; new buckets derived by ×{0.3, 1, 3, 10}
 
-确认应用？(yes / no)
+Confirm apply? (yes / no)
 ```
 
-### B4: 落地
+### B4: Land
 
-用户确认后：
-1. 编辑 `rubric_notes.md` 的 "Bucket 方案" 段，替换为新表
-2. 更新 `.cheat-state.json` 的 `baseline_plays` 字段（bucket scheme 不持久化——下次 cheat-predict 实时派生）
-3. 在 `rubric_notes.md` 的 bucket 段顶部追加一行变更记录：`v2 buckets recalibrated on YYYY-MM-DD: scheme=absolute, baseline=4.2w (基于 N=10 个样本)`
-4. **不**修改任何 prediction 文件——历史预测的 bucket 标签保持原样（在该样本写入时的方案下做出的判断）
+After the user confirms:
+1. Edit the "Bucket scheme" section of `rubric_notes.md` and replace it with the new table
+2. Update the `baseline_plays` field in `.cheat-state.json` (the bucket scheme is not persisted — the next cheat-predict derives it live)
+3. Append a change-log line at the top of the bucket section in `rubric_notes.md`: `v2 buckets recalibrated on YYYY-MM-DD: scheme=absolute, baseline=42k (based on N=10 samples)`
+4. **Do not** modify any prediction file — historical predictions keep their original bucket labels (judgments made under the scheme in force when that sample was written)
 
-### B5: 对未来预测的影响
+### B5: Impact on future predictions
 
-下一次 `/cheat-predict` 起按新 bucket 派生。历史 prediction 文件里的 bucket 标签**不重算**——bucket 是预测时的语义判断，事后改写会破坏盲度。
+The next `/cheat-predict` derives under the new buckets. Bucket labels in historical prediction files are **not recomputed** — a bucket is a semantic judgment made at prediction time; rewriting it afterward destroys the blind property.
 
-### Phase B 不做的事
+### What Phase B does not do
 
-- 不重打 composite（公式没变）
-- 不重新审核观察段（rubric 没变）
-- 不调跨模型审核（确定性派生无需判断）
-- 不要求严格的样本数门槛（按 READINESS_HEURISTIC 由 Claude 判断；ratio 模式 N=1 就能跑）
+- Does not re-score composites (the formula did not change)
+- Does not re-audit the observation section (the rubric did not change)
+- Does not call a cross-model audit (deterministic derivation needs no judgment)
+- Does not require a strict sample-count gate (Claude judges per READINESS_HEURISTIC; ratio mode runs at N=1)
 
 ---
 
 ## Key Rules
 
-1. **5 步不可跳**（仅完整 rubric bump）。任何"先简化跑一下"的请求都拒绝
-2. **THRESHOLD 写死**（仅完整 rubric bump）。不允许动态调整
-3. **跨模型审核是默认**（仅完整 rubric bump）。关闭审核需要在 state file 显式标记
-4. **cleanup pass 是 bump 的一部分**（仅完整 rubric bump）。不允许 bump 完不清理观察段
-5. **REQUIRE_CONFIRM**（两种模式都要）。最后落地前必须用户明确说 "yes, bump" 或 "yes, recalibrate"
-6. **bucket 重校不动历史预测**。bucket 是预测时语义，事后改写破坏盲度
+1. **The 5 steps cannot be skipped** (full rubric bump only). Any request to "simplify it first" is refused
+2. **THRESHOLD is hardcoded** (full rubric bump only). Dynamic adjustment is not allowed
+3. **Cross-model audit is the default** (full rubric bump only). Turning it off requires an explicit mark in the state file
+4. **The cleanup pass is part of the bump** (full rubric bump only). Bumping without cleaning the observation section is not allowed
+5. **REQUIRE_CONFIRM** (both modes). Before landing, the user must explicitly say "yes, bump" or "yes, recalibrate"
+6. **bucket recalibration does not touch historical predictions**. A bucket is the semantics at prediction time; rewriting it afterward destroys the blind property
 
 ## Refusals
 
-- 「跳过校准池重打，直接换公式」 → 拒绝。原则 #2
-- 「跳过 cheat-score-blind sub-agent，主 Claude 直接重打就行」 → 拒绝。bump **不接受**任何 self-scored fallback——sub-agent 不可用 → abort bump，不接受"自审"
-- 「跳过外部 LLM 审核」 → 仅当 `CROSS_MODEL_AUDIT=false` 显式设置
-- 「这次 THRESHOLD 调到 3/5 让它过」 → 拒绝。改 THRESHOLD 是元层级 bump
-- 「保留所有旧观察作为历史」 → 违反原则 #3
-- 「先 bump，cleanup 下次再做」 → 拒绝。cleanup 是 bump 的一部分
-- 「只重算 composite 不重打 dim」 → 拒绝。新权重 × 旧 dim 仍是旧污染。每个 dim 都由 sub-agent 重审 script
-- 「把 Memo 全文写进 rubric_notes.md 顶部，方便我读」 → 拒绝。rubric_notes.md 是 blind sub-agent 白名单——含视频名 / 实绩 → 通过白名单泄漏。Memo 写 rubric-memo.md（白名单**外**），rubric_notes.md 只放公式 + 通用语言维度定义 + 指针
-- 「派生证据段保留真实视频名，让 rubric 读起来更具体」 → 拒绝。在 rubric_notes.md 必须用通用语言（"高抽象密度样本"）；带视频名的派生证据写 rubric-memo.md
+- "Skip the calibration-pool re-score and just swap the formula" → refuse. Principle #2
+- "Skip the cheat-score-blind sub-agent; the main Claude can re-score directly" → refuse. bump **accepts no** self-scored fallback — sub-agent unavailable → abort the bump; "self-audit" is not accepted
+- "Skip the external LLM audit" → only when `CROSS_MODEL_AUDIT=false` is explicitly set
+- "Lower THRESHOLD to 3/5 this time so it passes" → refuse. Changing THRESHOLD is a meta-level bump
+- "Keep all the old observations as history" → violates principle #3
+- "Bump first, do the cleanup next time" → refuse. The cleanup is part of the bump
+- "Only recompute the composite, do not re-score the dims" → refuse. New weights × old dims are still old contamination. Every dim is re-examined against the script by the sub-agent
+- "Write the full memo into the top of rubric_notes.md so it's easier for me to read" → refuse. rubric_notes.md is the blind sub-agent's whitelist — containing video names / actual performance → leaks through the whitelist. The memo goes into rubric-memo.md (**outside** the whitelist); rubric_notes.md holds only the formula + generic-language dimension definitions + pointers
+- "Keep real video names in the derived-evidence section so the rubric reads more concretely" → refuse. rubric_notes.md must use generic language ("high-abstraction-density sample"); derived evidence with video names goes into rubric-memo.md
 
 ## Integration
 
-- 上游：`/cheat-retro` 检测到 ≥3 同向偏差 → 提议跑 `/cheat-bump`
-- 依赖：`mcp__llm-chat__chat`（如配置）+ Task tool（spawn cheat-score-blind）
-- 修改：
-  - `rubric_notes.md`（结构性更新，**绝不**写真实视频名 / 实绩）
-  - `rubric-memo.md`（**新**——append Memo 全文，含证据 + 派生证据）
-  - 所有 `predictions/*.md`（追加 Re-scored 行，不动预测段）
+- Upstream: `/cheat-retro` detects ≥3 same-direction misses → proposes running `/cheat-bump`
+- Dependencies: `mcp__llm-chat__chat` (if configured) + the Task tool (spawns cheat-score-blind)
+- Modifies:
+  - `rubric_notes.md` (structural update, **never** writes real video names / actual performance)
+  - `rubric-memo.md` (**new** — appends the full memo, including evidence + derived evidence)
+  - Every `predictions/*.md` (appends a Re-scored line; does not touch the prediction section)
   - `.cheat-state.json`
-- 下游：下一篇 `/cheat-predict` 自动按新 rubric_version 打分
+- Downstream: the next `/cheat-predict` automatically scores under the new rubric_version

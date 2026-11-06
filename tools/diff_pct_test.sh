@@ -10,6 +10,11 @@
 #   case 3: orig + ~20% new content appended
 #           → expected diff_pct 10-30
 #
+# The fixture bodies are intentionally kept in Chinese: the normalizer's
+# punctuation handling is tuned for CJK text, so these fixtures also guard
+# against regressions in Chinese-punctuation normalization. See
+# did-not-translate.md for the documented exception.
+#
 # Usage:
 #   bash tools/diff_pct_test.sh
 # Exit:
@@ -120,8 +125,8 @@ run_case "completely different topic" \
 echo ""
 echo "=== Case 3: orig + ~20% appended (outro / CTA scenario) ==="
 
-# Realistic 创作者 scenario: 拍前稿 ~150 字, 拍时加一句 30 字 outro
-# 增量 / 原稿 ≈ 20%, Levenshtein/max(orig,new) ≈ 16-20%
+# Realistic creator scenario: ~150-character pre-shoot draft, one 30-character outro added at shoot time
+# increment / original ≈ 20%, Levenshtein/max(orig,new) ≈ 16-20%
 cat > "$TMP/case3_orig.md" <<'EOF'
 # 视频 — 关于宿命论
 

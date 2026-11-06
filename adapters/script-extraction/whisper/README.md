@@ -1,71 +1,71 @@
-# Adapter: whisper（视频/音频转录）
+# Adapter: whisper (video/audio transcription)
 
-被 `/cheat-learn-from` 在 Way b（用户提供视频文件，让工具转录）时调用。
+Invoked by `/cheat-learn-from` in Way b (the user provides video files and lets the tool transcribe).
 
-> **优先 Way a**（用户直接粘 script 文本——简单 + 准确）。Way b（whisper）只在用户**找不到 script 只有视频**时用。
-
----
-
-## 这个 adapter 是干嘛的
-
-把 mp4 / mov / mp3 等媒体文件转成文字 transcript，让 Claude 能读对标账号的稿子。
-
-抖音 / B站 / YouTube 大多数视频**没有官方字幕**——拿稿子绕不开 ASR（语音转录）。这是为什么本 adapter 存在。
+> **Prefer Way a** (the user pastes script text directly — simple + accurate). Way b (whisper) is only for when the user **cannot find the script and has only the video**.
 
 ---
 
-## 安装（一次性）
+## What this adapter does
 
-### 选项 A：whisper-cpp（**推荐**——快、轻、纯 C++）
+Turns media files such as mp4 / mov / mp3 into a text transcript, so Claude can read a benchmark account's scripts.
 
-Mac M 系列芯片上一条 3 分钟视频转录 30-60 秒。
+Most Douyin / Bilibili / YouTube videos **have no official subtitles** — getting the script is impossible without ASR (speech transcription). That is why this adapter exists.
+
+---
+
+## Installation (one-time)
+
+### Option A: whisper-cpp (**recommended** — fast, light, pure C++)
+
+On Mac M-series chips, a 3-minute video transcribes in 30-60 seconds.
 
 ```bash
-# 1. 装 whisper-cpp
+# 1. Install whisper-cpp
 brew install whisper-cpp
 
-# 2. 装 ffmpeg（whisper-cpp 依赖，从视频里抽音频）
+# 2. Install ffmpeg (a whisper-cpp dependency; extracts audio from video)
 brew install ffmpeg
 
-# 3. 下载模型（中文推荐 medium 或 large-v3，准确度够 + 速度还行）
-# whisper-cpp 第一次运行会自动下载，或手动：
+# 3. Download a model (for Chinese, medium or large-v3 is recommended — accurate enough + reasonably fast)
+# whisper-cpp downloads automatically on first run, or manually:
 mkdir -p ~/.whisper-cpp/models
 cd ~/.whisper-cpp/models
-# medium 模型 (~1.5GB)
+# medium model (~1.5GB)
 curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin
 ```
 
-### 选项 B：openai-whisper（Python 版，更慢但有 API 兼容性）
+### Option B: openai-whisper (Python version; slower but has API compatibility)
 
 ```bash
 pip install openai-whisper
 brew install ffmpeg
 
-# 模型自动下载
+# models download automatically
 ```
 
-### 选项 C：用云端 API（不需要本地模型）
+### Option C: use a cloud API (no local model needed)
 
-`/cheat-learn-from` 暂不直接支持云端 API——如果你有 OpenAI / Azure / 阿里云的 ASR API key，可以自己改 `run.sh` 走云端。
+`/cheat-learn-from` does not yet support cloud APIs directly — if you have an OpenAI / Azure / Alibaba Cloud ASR API key, you can edit `run.sh` yourself to use the cloud.
 
 ---
 
-## 用法
+## Usage
 
-cheat-learn-from 自动调用，你不需要手动跑。但如果想手动测试：
+cheat-learn-from calls it automatically; you do not need to run it by hand. But if you want to test manually:
 
 ```bash
-# 转录单个视频
+# Transcribe a single video
 bash run.sh <video_path> <output_dir>
 
-# 例：
-bash run.sh ~/Desktop/对标账号/某视频.mp4 ~/my-channel/samples/对标账号/abc123/
-# → 输出 ~/my-channel/samples/对标账号/abc123/transcript.md
+# Example:
+bash run.sh ~/Desktop/benchmark-account/some-video.mp4 ~/my-channel/samples/benchmark-account/abc123/
+# → outputs ~/my-channel/samples/benchmark-account/abc123/transcript.md
 ```
 
-## 输出格式
+## Output format
 
-`transcript.md`：
+`transcript.md`:
 
 ```markdown
 # Transcript: <video filename>
@@ -77,51 +77,51 @@ bash run.sh ~/Desktop/对标账号/某视频.mp4 ~/my-channel/samples/对标账�
 
 ---
 
-[纯文本转录，按段落分（不是字幕格式）]
+[plain-text transcript, split into paragraphs (not subtitle format)]
 ```
 
-> 注意 whisper 输出的字幕是按 **句子** 分行的（每句换行 + 时间戳）。
-> run.sh 会去掉时间戳 + 把短句合并成段落，让 Claude 读起来像稿子，不是字幕表。
+> Note: whisper's subtitle output breaks lines by **sentence** (one line per sentence + a timestamp).
+> run.sh strips the timestamps + merges short sentences into paragraphs, so Claude reads it like a script rather than a subtitle sheet.
 
-## 失败模式
+## Failure modes
 
-| 症状 | 原因 | 处理 |
+| Symptom | Cause | Handling |
 |---|---|---|
-| `whisper-cpp: command not found` | 没装 | 跑 `brew install whisper-cpp` |
-| `ffmpeg: command not found` | 没装 ffmpeg | 跑 `brew install ffmpeg` |
-| 转录乱码 / 大量错字 | 视频是英文但用了中文模型，反之亦然 | 改 `run.sh` 里 `--language` 参数 |
-| 转录慢（>10 分钟） | 用了 large 模型 + 没有 GPU/M-chip 加速 | 换 medium 模型 |
-| Disk full | 模型文件大（large-v3 ~3GB） | 用 medium（~1.5GB）够用 |
+| `whisper-cpp: command not found` | Not installed | Run `brew install whisper-cpp` |
+| `ffmpeg: command not found` | ffmpeg not installed | Run `brew install ffmpeg` |
+| Garbled transcript / many typos | The video is in English but a Chinese model was used, or vice versa | Change the `--language` argument in `run.sh` |
+| Transcription is slow (>10 minutes) | Using the large model + no GPU/M-chip acceleration | Switch to the medium model |
+| Disk full | Large model files (large-v3 ~3GB) | medium (~1.5GB) is enough |
 
-## 稳定性等级
+## Stability level
 
-★★★★ — whisper 是开源标准 ASR，不会突然失效。模型更新自由，pin 版本无虞。
+★★★★ — whisper is the open-source standard for ASR and will not suddenly break. You can update models freely, and pinning a version is safe.
 
-## 风险提示
+## Risk notes
 
-- **TOS**：你转录**自己下载的对标账号视频**用于个人学习参考是合理使用；**不要**把转录结果再发布
-- **隐私**：whisper 全部本地运行，不传任何数据到云端
+- **TOS**: transcribing **benchmark videos you downloaded yourself** for personal study and reference is fair use; **do not** republish the transcripts
+- **Privacy**: whisper runs entirely locally and sends no data to the cloud
 
-## 文件清单
+## File list
 
 ```
 adapters/script-extraction/whisper/
-├── README.md           # 本文件
-└── run.sh              # cheat-learn-from 调用的 wrapper
+├── README.md           # this file
+└── run.sh              # wrapper invoked by cheat-learn-from
 ```
 
-## 与其他 adapter 的关系
+## Relationship to the other adapters
 
-- 同 `adapters/perf-data/douyin-session/`、`adapters/trend-sources/*` 一样，是 cheat-on-content 的可选 adapter
-- 只在 `/cheat-learn-from --way b` 时调用——Way a（粘文本）不需要
+- Like `adapters/perf-data/douyin-session/` and `adapters/trend-sources/*`, it is an optional cheat-on-content adapter
+- Only invoked by `/cheat-learn-from --way b` — Way a (paste text) does not need it
 
-## 用户自己下载视频的说明
+## Notes on downloading videos yourself
 
-工具**不直接抓视频**——避免 TOS 风险 + 反爬维护成本。建议用：
+The tool **does not scrape videos directly** — avoiding TOS risk + anti-scraping maintenance cost. Suggestions:
 
-- **抖音**：第三方下载器 / 抖音 PC 版 → 复制视频链接 → 粘进下载器
-- **B站**：[BBDown](https://github.com/nilaoda/BBDown) / [you-get](https://github.com/soimort/you-get)
-- **YouTube**：[yt-dlp](https://github.com/yt-dlp/yt-dlp)（最强大）
-- **小红书**：[xhs-downloader](https://github.com/JoeanAmier/XHS-Downloader)
+- **Douyin**: a third-party downloader / Douyin PC app → copy the video link → paste into the downloader
+- **Bilibili**: [BBDown](https://github.com/nilaoda/BBDown) / [you-get](https://github.com/soimort/you-get)
+- **YouTube**: [yt-dlp](https://github.com/yt-dlp/yt-dlp) (the most powerful)
+- **Xiaohongshu**: [xhs-downloader](https://github.com/JoeanAmier/XHS-Downloader)
 
-下载后扔到 `samples/<benchmark-name>/<video-id>/source.mp4` 即可——cheat-learn-from 会自动找到。
+Once downloaded, drop them at `samples/<benchmark-name>/<video-id>/source.mp4` — cheat-learn-from will find them automatically.

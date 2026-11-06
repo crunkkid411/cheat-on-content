@@ -1,4 +1,4 @@
-"""把抓到的 B站数据渲染成 NotebookLM 友好的 Markdown（与 douyin-session 同格式）。"""
+"""Render the fetched Bilibili data into NotebookLM-friendly Markdown (same format as douyin-session)."""
 from __future__ import annotations
 
 import datetime as dt
@@ -7,7 +7,7 @@ from pathlib import Path
 
 def _fmt_time(ts: int) -> str:
     if not ts:
-        return "未知"
+        return "unknown"
     return dt.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
 
 
@@ -15,7 +15,7 @@ def _fmt_num(n: int | None) -> str:
     if n is None:
         return "-"
     if n >= 10000:
-        return f"{n / 10000:.1f}w"
+        return f"{n / 1000:.1f}k"
     return str(n)
 
 
@@ -33,43 +33,43 @@ def _ratio(num: int | None, den: int | None) -> str:
 
 def render_report(video: dict, script: str, comments: list[dict]) -> str:
     lines: list[str] = []
-    title = video.get("title") or "(无标题)"
+    title = video.get("title") or "(untitled)"
     bvid = video["bvid"]
     play = video.get("play_count") or 0
 
     lines.append(f"# {title}")
     lines.append("")
-    lines.append(f"- BV 号：`{bvid}`")
-    lines.append(f"- UP 主：{video.get('owner') or '-'}")
-    lines.append(f"- 发布时间：{_fmt_time(video.get('pubdate', 0))}")
-    lines.append(f"- 时长：{_fmt_duration(video.get('duration_s', 0))}")
-    lines.append(f"- 链接：https://www.bilibili.com/video/{bvid}")
-    lines.append(f"- 抓取时间：{dt.datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    lines.append(f"- BV number: `{bvid}`")
+    lines.append(f"- Uploader: {video.get('owner') or '-'}")
+    lines.append(f"- Published at: {_fmt_time(video.get('pubdate', 0))}")
+    lines.append(f"- Duration: {_fmt_duration(video.get('duration_s', 0))}")
+    lines.append(f"- Link: https://www.bilibili.com/video/{bvid}")
+    lines.append(f"- Fetched at: {dt.datetime.now().strftime('%Y-%m-%d %H:%M')}")
     lines.append("")
 
-    lines.append("## 播放数据")
+    lines.append("## Play data")
     lines.append("")
-    lines.append(f"- 播放：{_fmt_num(play)}")
-    lines.append(f"- 点赞：{_fmt_num(video.get('like_count'))}（赞播比 {_ratio(video.get('like_count'), play)}）")
-    lines.append(f"- 投币：{_fmt_num(video.get('coin_count'))}（投币率 {_ratio(video.get('coin_count'), play)}）")
-    lines.append(f"- 收藏：{_fmt_num(video.get('favorite_count'))}（收藏率 {_ratio(video.get('favorite_count'), play)}）")
-    lines.append(f"- 分享：{_fmt_num(video.get('share_count'))}（分播比 {_ratio(video.get('share_count'), play)}）")
-    lines.append(f"- 评论：{_fmt_num(video.get('comment_count'))}")
-    lines.append(f"- 弹幕：{_fmt_num(video.get('danmaku_count'))}")
+    lines.append(f"- Plays: {_fmt_num(play)}")
+    lines.append(f"- Likes: {_fmt_num(video.get('like_count'))} (like-to-play {_ratio(video.get('like_count'), play)})")
+    lines.append(f"- Coins: {_fmt_num(video.get('coin_count'))} (coin rate {_ratio(video.get('coin_count'), play)})")
+    lines.append(f"- Saves: {_fmt_num(video.get('favorite_count'))} (save rate {_ratio(video.get('favorite_count'), play)})")
+    lines.append(f"- Shares: {_fmt_num(video.get('share_count'))} (share-to-play {_ratio(video.get('share_count'), play)})")
+    lines.append(f"- Comments: {_fmt_num(video.get('comment_count'))}")
+    lines.append(f"- Danmaku: {_fmt_num(video.get('danmaku_count'))}")
     lines.append("")
-    lines.append("> 派生比率（赞播比 / 投币率 / 收藏率 / 分播比）是单纯播放量看不出的信号；"
-                 "B站「三连率」（点赞+投币+收藏）尤其能反映内容的硬核认可度。")
-    lines.append("")
-
-    lines.append("## 原始稿子")
-    lines.append("")
-    lines.append(script.strip() if script.strip() else "（未提供）")
+    lines.append("> The derived ratios (like-to-play / coin rate / save rate / share-to-play) are signals that raw play count cannot show; "
+                 "Bilibili's \"triple-combo rate\" (like + coin + save) especially reflects hardcore approval of the content.")
     lines.append("")
 
-    lines.append(f"## 评论（按点赞降序，共 {len(comments)} 条）")
+    lines.append("## Original script")
+    lines.append("")
+    lines.append(script.strip() if script.strip() else "(not provided)")
+    lines.append("")
+
+    lines.append(f"## Comments (sorted by likes descending; {len(comments)} total)")
     lines.append("")
     if not comments:
-        lines.append("（未抓到评论，可能评论区关闭或该视频暂无评论）")
+        lines.append("(No comments captured; the comment section may be closed or the video has no comments yet)")
     else:
         for c in comments:
             text = (c.get("text") or "").replace("\n", " ").strip()
@@ -88,6 +88,6 @@ def slugify(text: str, max_len: int = 30) -> str:
 
 
 def output_dir_for(video: dict, root: Path) -> Path:
-    date = _fmt_time(video.get("pubdate", 0))[:10].replace("未知", "nodate")
+    date = _fmt_time(video.get("pubdate", 0))[:10].replace("unknown", "nodate")
     slug = slugify(video.get("title") or video["bvid"])
     return root / f"{date}_{slug}"

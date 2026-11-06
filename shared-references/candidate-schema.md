@@ -1,75 +1,75 @@
-# Candidate Schema（候选项统一 schema）
+# Candidate Schema
 
-被这些子 skill 引用：`cheat-trends`、`cheat-recommend`、`cheat-init`、所有 `adapters/`。
+Referenced by these sub-skills: `cheat-trends`, `cheat-recommend`, `cheat-init`, and every adapter under `adapters/`.
 
-任何"待决定要不要做"的内容素材——不管来自手粘列表 / RSS / Notion / 平台热点抓取——都必须 normalize 成本 schema 之后才进入候选池。这是 `adapters/` 的输出契约。
+Any content material whose fate is "decide whether to make it" — whether it comes from a hand-pasted list / RSS / Notion / a platform trend scrape — must be normalized into this schema before entering the candidate pool. This is the output contract for `adapters/`.
 
-字段设计参考博主项目的 `articles` 表 schema（私有项目，工具的方法论由此抽象而来）。
+The field design borrows from the reference-creator project's `articles` table schema (a private project; the tool's methodology was abstracted from it).
 
 ---
 
-## 必填字段
+## Required fields
 
-| 字段 | 类型 | 说明 |
+| Field | Type | Description |
 |---|---|---|
-| `id` | string (12 chars) | 稳定 hash：`sha256(source + normalized_title + url_path)[:12]`。同一条素材在不同时间被抓到 → 同 id |
-| `title` | string | 候选项的人类可读标题 |
-| `source` | string | 来源标识，格式 `<adapter-type>:<source-name>`，例：`trend:hackernews`、`pool:notion-mybook`、`paste:manual` |
-| `snapshot_text` | string | 候选项的全文或摘要——**这是打分的输入**，不是 url。adapter 必须负责把 url 拓展成可读文本 |
-| `snapshot_at` | ISO 8601 | 抓取/录入这条 item 的时间 |
+| `id` | string (12 chars) | Stable hash: `sha256(source + normalized_title + url_path)[:12]`. The same material captured at different times → same id |
+| `title` | string | Human-readable title of the candidate |
+| `source` | string | Source identifier in the format `<adapter-type>:<source-name>`, e.g. `trend:hackernews`, `pool:notion-mybook`, `paste:manual` |
+| `snapshot_text` | string | Full text or summary of the candidate — **this is the input to scoring**, not the url. The adapter must expand the url into readable text |
+| `snapshot_at` | ISO 8601 | Time this item was captured / entered |
 
 ---
 
-## 可选字段
+## Optional fields
 
-| 字段 | 类型 | 说明 |
+| Field | Type | Description |
 |---|---|---|
-| `url` | string | 原始链接（便于追溯） |
-| `tier` | enum | `tier1` / `tier2` / `tier3` / `skip` / `risky` / `done`。粗分类，用于过滤 |
-| `read_status` | enum | `unread` / `skimmed` / `deep_read` / `done`。处理状态 |
-| `category` | string | 自定义分类标签（如"社会"、"家庭"、"学术"） |
-| `composite_score` | float | 用当前 rubric 打分得到的综合分（如已打） |
-| `dimension_scores` | object | 各维度的整数分，键名对齐当前 rubric 的维度（如 `{"ER": 5, "HP": 4, ...}`） |
-| `scored_under_rubric_version` | string | 打分时用的 rubric 版本号 |
-| `predicted_bucket` | string | 粗预测桶（如 `30-100w`），**注意：不是正式预测**——选题阶段的粗略估计，与 `predictions/*.md` 的 immutable 预测完全独立 |
-| `predicted_reason` | string | 一句话理由 |
-| `note` | string | 自由文本备注，例如"等节点再发"、"待重读"、"风险议题" |
-| `rejected_at` / `rejected_reason` | ISO 8601 / string | 用户主动跳过此候选时记录 |
+| `url` | string | Original link (for traceability) |
+| `tier` | enum | `tier1` / `tier2` / `tier3` / `skip` / `risky` / `done`. Coarse classification, used for filtering |
+| `read_status` | enum | `unread` / `skimmed` / `deep_read` / `done`. Processing state |
+| `category` | string | Custom category tag (e.g. "society", "family", "academia") |
+| `composite_score` | float | Composite score from the current rubric (if scored) |
+| `dimension_scores` | object | Integer scores per dimension, keyed to the current rubric's dimensions (e.g. `{"ER": 5, "HP": 4, ...}`) |
+| `scored_under_rubric_version` | string | Rubric version used at scoring time |
+| `predicted_bucket` | string | Rough prediction bucket (e.g. `30-100w`). **Note: this is not a formal prediction** — it is a coarse estimate from the topic-selection stage, completely independent of the immutable prediction in `predictions/*.md` |
+| `predicted_reason` | string | One-line reason |
+| `note` | string | Free-text note, e.g. "wait for the right moment", "re-read later", "risky topic" |
+| `rejected_at` / `rejected_reason` | ISO 8601 / string | Recorded when the user actively skips this candidate |
 
 ---
 
-## JSON 范例
+## JSON examples
 
-### Markdown 列表 adapter 输出
+### Markdown-list adapter output
 
 ```json
 {
   "id": "a3f2c1d4e5b6",
-  "title": "为什么我们都讨厌主动联系朋友",
+  "title": "Why we all hate reaching out to friends first",
   "source": "pool:markdown-list",
-  "snapshot_text": "[用户从 candidates.md 复制的全文]",
+  "snapshot_text": "[full text copied by the user from candidates.md]",
   "snapshot_at": "2026-05-04T08:30:00+08:00",
   "url": null,
   "tier": "tier1",
   "read_status": "skimmed",
-  "category": "社交",
+  "category": "social",
   "composite_score": 7.4,
   "dimension_scores": {"ER": 4, "HP": 4, "QL": 5, "NA": 3, "AB": 5, "SR": 3, "SAT": 3},
   "scored_under_rubric_version": "v0",
   "predicted_bucket": "5-30w",
-  "predicted_reason": "ER=4+QL=5 强金句感，AB=5 普适，但 SR=3 议题不够强",
+  "predicted_reason": "ER=4+QL=5 strong quotable feel, AB=5 universal, but SR=3 topic is not strong enough",
   "note": ""
 }
 ```
 
-### Trend adapter 输出（HN）
+### Trend adapter output (HN)
 
 ```json
 {
   "id": "8c4d92e1f0b3",
   "title": "Show HN: I built a tool that predicts whether your video will go viral",
   "source": "trend:hackernews",
-  "snapshot_text": "[文章全文 + 评论 top 5 的摘要]",
+  "snapshot_text": "[full article + summary of top 5 comments]",
   "snapshot_at": "2026-05-04T09:15:00+08:00",
   "url": "https://news.ycombinator.com/item?id=12345678",
   "tier": null,
@@ -81,36 +81,36 @@
 }
 ```
 
-打分前 score 字段全部为 null——是预期的。`cheat-trends` 抓回来后会调 `cheat-score` 给每条算 composite。
+Before scoring, all score fields are null — that is expected. After `cheat-trends` fetches items, it calls `cheat-score` to compute a composite for each one.
 
 ---
 
-## Markdown 表示（用户可见的存储格式）
+## Markdown representation (the user-visible storage format)
 
-候选池的默认存储是 `candidates.md`（人类可读），不是 JSON。每条 item 是一个 H3 entry：
+The default storage for the candidate pool is `candidates.md` (human-readable), not JSON. Each item is an H3 entry:
 
 ```markdown
-### [tier1] 为什么我们都讨厌主动联系朋友
+### [tier1] Why we all hate reaching out to friends first
 - **id**: a3f2c1d4e5b6
 - **source**: pool:markdown-list
 - **snapshot_at**: 2026-05-04
-- **category**: 社交
+- **category**: social
 - **composite (v0)**: 7.4 — ER=4 HP=4 QL=5 NA=3 AB=5 SR=3 SAT=3
 - **predicted bucket**: 5-30w
 - **note**:
 
-> [snapshot_text 段，如有]
+> [snapshot_text section, if any]
 ```
 
-升级到 SQLite 之后（见 `cheat-status` 的升级触发），同样字段走 `articles` 表存储，markdown 视图自动从 DB 渲染。
+After upgrading to SQLite (see the upgrade trigger in `cheat-status`), the same fields are stored in the `articles` table, and the markdown view is rendered from the DB automatically.
 
 ---
 
-## ID 稳定性的关键规则
+## Key rules for ID stability
 
-**同一条素材在不同时间被不同 adapter 抓到 → 必须算出同 id**。这是去重的基础。
+**The same material captured at different times by different adapters → must produce the same id**. This is the basis of deduplication.
 
-算法：
+Algorithm:
 ```python
 import hashlib
 
@@ -121,49 +121,49 @@ def candidate_id(source: str, title: str, url: str = None) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
 ```
 
-注意：
-- `source` 取冒号前的 adapter type（`trend:hackernews` → `trend`），不是具体 source name——同一标题被 HN 和 Reddit 都抓到，应判定为同一候选（避免重复打分）
-- title 做了 lowercase + 去空格——避免 "Hello World" 和 "hello world" 被算成不同 id
-- url 砍掉 query string—— `?utm_source=xxx` 不影响内容
+Notes:
+- `source` uses the adapter type before the colon (`trend:hackernews` → `trend`), not the specific source name — the same title captured by both HN and Reddit should be treated as one candidate (avoid double scoring)
+- title is lowercased + spaces removed — so "Hello World" and "hello world" are not counted as different ids
+- url drops the query string — `?utm_source=xxx` does not affect the content
 
 ---
 
-## 去重协议
+## Deduplication protocol
 
-`cheat-trends` / `cheat-recommend` 在写入 `candidates.md` 前必须执行：
+Before writing to `candidates.md`, `cheat-trends` / `cheat-recommend` must run:
 
-1. 计算新 item 的 id
-2. 检查 `candidates.md` 是否已含此 id → 跳过
-3. 检查 `predictions/*.md` 是否含此 id（已发过）→ 跳过
-4. 检查 `.cheat-cache/trends-history.jsonl` 是否含此 id 且 `rejected_at != null` → 跳过（用户已主动拒绝过）
-5. 通过则写入
+1. Compute the new item's id
+2. Check whether `candidates.md` already contains this id → skip
+3. Check whether `predictions/*.md` contains this id (already published) → skip
+4. Check whether `.cheat-cache/trends-history.jsonl` contains this id with `rejected_at != null` → skip (the user already actively rejected it)
+5. If it passes, write it
 
-`.cheat-cache/trends-history.jsonl` 是抓取历史的去重缓存，每行一个 JSON record，append-only。被用户拒绝的候选会在这里保留 6 个月；之后允许重新出现（也许素材在新 rubric 下评估不同）。
+`.cheat-cache/trends-history.jsonl` is the dedup cache of fetch history; one JSON record per line, append-only. Candidates rejected by the user stay here for 6 months; afterwards they may reappear (perhaps the material will be evaluated differently under a new rubric).
 
 ---
 
-## tier 的语义
+## Semantics of tier
 
-| Tier | 含义 | 对应行动 |
+| Tier | Meaning | Corresponding action |
 |---|---|---|
-| `tier1` | 强候选，应推荐 | 进入 `cheat-recommend` 排序池 |
-| `tier2` | 中等，备选 | 进入排序池但权重低 |
-| `tier3` | 弱候选，备而不用 | 不进推荐池，留作长尾 |
-| `skip` | 用户主动跳过 | 不再出现 |
-| `risky` | 议题敏感 / 平台风控风险 | 推荐时额外标注，需用户确认 |
-| `done` | 已发布 | 移出候选池，由 prediction file 接管 |
+| `tier1` | Strong candidate, should recommend | Enters the `cheat-recommend` ranking pool |
+| `tier2` | Medium, backup | Enters the ranking pool with lower weight |
+| `tier3` | Weak candidate, keep but do not use | Not in the recommendation pool; kept as long tail |
+| `skip` | User actively skipped | Never appears again |
+| `risky` | Sensitive topic / platform moderation risk | Extra label when recommending; needs user confirmation |
+| `done` | Published | Removed from the candidate pool; the prediction file takes over |
 
-**Cold-start 期间所有 item 默认是 `unread`/`null tier`**——直到用户或 `cheat-score` 给出 composite 后才能粗分类。**未打分的 item 不应出现在 `cheat-recommend` 输出**——避免推荐没读过的素材。
+**During cold-start every item defaults to `unread` / `null tier`** — coarse classification is only possible after the user or `cheat-score` produces a composite. **Unscored items must not appear in `cheat-recommend` output** — avoid recommending material that has not been read.
 
 ---
 
-## adapter 实现契约
+## Adapter implementation contract
 
-任何 `adapters/` 下的 adapter 都必须：
+Any adapter under `adapters/` must:
 
-1. 实现 `fetch() → List[Candidate]` 接口（伪签名，实际是 markdown 文档描述的协议）
-2. 输出符合本 schema 的 items
-3. 自己负责把 url / 短摘要拓展成可读 `snapshot_text`——**adapter 不输出"光秃秃的 url"**
-4. 优雅降级：如配置缺失（API key、cookie），返回空列表 + 在 stderr/log 写明原因，**不抛异常**
+1. Implement the `fetch() → List[Candidate]` interface (pseudo-signature; the actual protocol is described in markdown docs)
+2. Output items conforming to this schema
+3. Expand the url / short summary into readable `snapshot_text` itself — **an adapter must not output a "bare url"**
+4. Degrade gracefully: if configuration is missing (API key, cookie), return an empty list + state the reason in stderr/log, **do not throw**
 
-详见 `adapters/HOWTO.md`（待批次 3 写）。
+See `adapters/HOWTO.md` (to be written in batch 3).

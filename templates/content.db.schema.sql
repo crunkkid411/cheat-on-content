@@ -1,7 +1,7 @@
 -- cheat-on-content / content.db.schema
 --
 -- SQLite schema for the calibration pool when scale demands it.
--- Schema is largely lifted from the 视频分析 reference implementation:
+-- Schema is largely lifted from the video-analysis reference implementation:
 --   - articles: one row per piece of content (candidate or published)
 --   - scoring_history: append-only log of every scoring event (version traceability)
 --   - bumps: append-only log of rubric upgrades

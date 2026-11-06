@@ -1,102 +1,102 @@
-# Rubric Memo — Bump 升级档案
+# Rubric Memo — bump upgrade archive
 
-> ⚠️ **本文件是 Channel A 内部参考。Channel B（cheat-score-blind sub-agent）**永远不读**本文件**——blind sub-agent 的 hard refusal list 显式包含本文件路径。
+> ⚠️ **This file is Channel A internal reference. Channel B (the cheat-score-blind sub-agent) NEVER reads this file** — the blind sub-agent's hard refusal list explicitly includes this file path.
 >
-> 这里累积每次 rubric bump 的完整 Memo：触发观察、证据数据表（含真实样本名 + 实绩）、诊断、跨模型审核结论、已知局限。
+> It accumulates the full memo of every rubric bump: triggering observations, evidence data tables (including real sample names + actual performance), diagnosis, cross-model audit conclusions, and known limitations.
 
 ---
 
-## 这文件是干嘛的
+## What this file is for
 
-cheat-bump Phase 5 落地时把升级 Memo 写**这里**，**不写**进 `rubric_notes.md`。
+When cheat-bump Phase 5 lands, write the bump memo **here**, **not** into `rubric_notes.md`.
 
-历史上 cheat-bump 把 Memo 全文（含视频名 + 实绩 + 派生证据）写到 `rubric_notes.md`。但 `rubric_notes.md` 是 blind sub-agent 的白名单文件——sub-agent 通过它泄漏实绩数据，本应隔离的盲打分变成"看过实绩的事后解释"。
+Historically cheat-bump wrote the full memo (including video names + actual performance + derived evidence) into `rubric_notes.md`. But `rubric_notes.md` is the blind sub-agent's whitelist file — the sub-agent leaked actual-performance data through it, turning blind scoring that should have been isolated into "post-hoc rationalization after seeing the results".
 
-修复方案：
+The fix:
 
-| 文件 | 内容 | blind 白名单 |
+| File | Content | Blind whitelist |
 |---|---|---|
-| `rubric_notes.md` | 公式 / 维度定义（**通用语言**，不含视频名 / 实绩）/ Bucket 段 / 顶部 metadata | ✅ YES |
-| `rubric-memo.md`（本文件） | 升级 Memo 全文（**含**真实视频名 + 真实播放数 + 派生证据） | ❌ NO（硬禁读） |
+| `rubric_notes.md` | Formula / dimension definitions (**generic language**, no video names / actual performance) / bucket section / top metadata | ✅ YES |
+| `rubric-memo.md` (this file) | Full bump memo (**including** real video names + real play counts + derived evidence) | ❌ NO (strictly forbidden) |
 
 ---
 
-## 写入规则（cheat-bump Phase 5）
+## Writing rules (cheat-bump Phase 5)
 
-- **追加模式**：新 bump 的 Memo **append 到文件末尾**，旧 Memo 不动。按时间倒序倒着读可看 rubric 演化全程
-- **每段 Memo 必含 6 个组件**（按 [bump-validation-protocol.md](../shared-references/bump-validation-protocol.md) Step 5 模板）：
-  1. 触发观察（哪些观察累积到 ≥3 同向偏差）
-  2. 证据数据（校准池重打表 + 排序对照——**含真实视频名 + 实绩**）
-  3. 诊断（rubric 哪条假设被推翻）
-  4. 新公式（变化的权重 / 维度）
-  5. 跨模型审核结论引用（channel C verdict + 理由摘录）
-  6. 已知局限（这次 bump 没解决什么）
+- **Append mode**: a new bump memo is **appended to the end of the file**; old memos are untouched. Reading in reverse chronological order shows the full rubric evolution
+- **Every memo must contain 6 components** (per the [bump-validation-protocol.md](../shared-references/bump-validation-protocol.md) Step 5 template):
+  1. Triggering observations (which observations accumulated to ≥3 same-direction misses)
+  2. Evidence data (calibration-pool re-score table + ranking comparison — **including real video names + actual performance**)
+  3. Diagnosis (which rubric hypothesis was refuted)
+  4. New formula (changed weights / dimensions)
+  5. Cross-model audit conclusion citation (channel C verdict + reason excerpt)
+  6. Known limitations (what this bump did not solve)
 
-- **派生证据段**也写**这里**：「派生证据：「视频 X」CC=1 → 实绩 13.7w」这种 named anchor 在 `rubric_notes.md` 里**绝对不允许**，全部沉淀进本文件
+- **The derived-evidence section** also goes **here**: named anchors such as "derived evidence: 'video X' CC=1 → actual 137k" are **absolutely not allowed** in `rubric_notes.md`; they all settle into this file
 
 ---
 
-## 谁读本文件
+## Who reads this file
 
-| Skill | 读？ | 干啥 |
+| Skill | Reads? | What it does |
 |---|---|---|
-| `cheat-bump` Phase 5 | ✅ 写 | append 新 Memo |
-| `cheat-retro` | ✅ 读 | 复盘时回看历史 Memo 找 rubric 演化轨迹 |
-| `cheat-status` | ✅ 读 | 看板上显示"上次 bump 用了什么证据" |
-| **`cheat-score-blind`** | ❌ **硬禁** | refusal_code: `blocked_rubric_memo` |
-| `cheat-score` / `cheat-predict` 主 Claude 自估那部分 | 不主动读 | 主对话本身已被污染，再读一遍 Memo 也只是冗余 |
+| `cheat-bump` Phase 5 | ✅ writes | Append new memos |
+| `cheat-retro` | ✅ reads | Looks back at historical memos during retro to find the rubric evolution trail |
+| `cheat-status` | ✅ reads | Shows "what evidence the last bump used" on the dashboard |
+| **`cheat-score-blind`** | ❌ **strictly forbidden** | refusal_code: `blocked_rubric_memo` |
+| The main-Claude self-estimate part of `cheat-score` / `cheat-predict` | Does not proactively read | The main conversation is already contaminated; reading the memo again is just redundant |
 
 ---
 
-## Memo 段格式（cheat-bump 用此格式写）
+## Memo section format (cheat-bump writes in this format)
 
-每次 bump append 一段，格式：
+Append one section per bump, in this format:
 
 ```markdown
 ---
 
-## v<N> → v<N+1> Memo （bumped at <ISO 8601>）
+## v<N> → v<N+1> Memo (bumped at <ISO 8601>)
 
-### 触发观察
-（列累积到本次 bump 的 ≥3 同向偏差观察 ID + 一句话总结。引用 rubric_notes.md 的观察 ID）
+### Triggering observations
+(List the ≥3 same-direction miss observation IDs that accumulated to this bump + a one-line summary. Cite observation IDs from rubric_notes.md.)
 
-### 证据数据
-**校准池重打表**：
+### Evidence data
+**Calibration-pool re-score table**:
 
-| 样本 | composite (vN) | composite (vN+1) | rank (vN+1) | 实绩 | rank (actual) | delta |
+| Sample | composite (vN) | composite (vN+1) | rank (vN+1) | Actual | rank (actual) | delta |
 |---|---|---|---|---|---|---|
-| 「真实视频名 1」 | 9.41 | 9.55 | 1 | 124.8w | 1 | 0 |
-| 「真实视频名 2」 | 8.24 | 9.11 | 2 | 71.1w | 2 | 0 |
+| "Real video name 1" | 9.41 | 9.55 | 1 | 1.248M | 1 | 0 |
+| "Real video name 2" | 8.24 | 9.11 | 2 | 711k | 2 | 0 |
 | ... | ... | ... | ... | ... | ... | ... |
 
-**派生证据**（如有）：
-- 「视频名 X」CC=1 → 实绩 Y w 验证「高抽象密度 → 低 reach」假设
+**Derived evidence** (if any):
+- "Video name X" CC=1 → actual Y validated the "high abstraction density → low reach" hypothesis
 - ...
 
-### 诊断
-（rubric vN 的哪条假设被数据推翻；为什么 vN+1 的公式能解释偏差）
+### Diagnosis
+(Which hypothesis of rubric vN was refuted by the data; why the vN+1 formula explains the deviation)
 
-### 新公式
-旧：`(ER×1.5 + SR×1.5 + HP×1.5 + QL + NA + AB + SAT) / 8.5 × 2.0`
-新：`(ER×2.0 + HP×1.5 + MS×1.5 + QL + SR + TS + SAT) / 9.0 × 2.0`
+### New formula
+Old: `(ER×1.5 + SR×1.5 + HP×1.5 + QL + NA + AB + SAT) / 8.5 × 2.0`
+New: `(ER×2.0 + HP×1.5 + MS×1.5 + QL + SR + TS + SAT) / 9.0 × 2.0`
 
-变化：删 NA / AB；加 MS / TS；ER 权重 1.5 → 2.0
+Changes: removed NA / AB; added MS / TS; ER weight 1.5 → 2.0
 
-### 跨模型审核（channel C）
-- 审核模型：qwen-max-2025-XX
-- 判定：PASS
-- 理由摘录：「...」
-- 关键风险：「...」
+### Cross-model audit (channel C)
+- Audit model: qwen-max-2025-XX
+- Verdict: PASS
+- Reason excerpt: "..."
+- Key risk: "..."
 
-### 已知局限
-（这次 bump 没解决的事；下次 bump 时仍待观察的方向）
+### Known limitations
+(What this bump did not solve; directions still to watch at the next bump)
 
 ```
 
 ---
 
-## 例：v0 → v1（首次 bump）
+## Example: v0 → v1 (first bump)
 
-（cheat-init 创建时本文件为空，首次 bump 时在此追加第一段 Memo）
+(cheat-init creates this file empty; the first memo is appended here on the first bump)
 
-<!-- 后续 bump 在此 append -->
+<!-- subsequent bumps append here -->

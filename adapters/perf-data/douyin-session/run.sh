@@ -8,7 +8,7 @@
 #   bash run.sh <aweme_id> <video_folder> [<script_path>]
 #
 # Example:
-#   bash run.sh 7234567890123456789 ~/my-channel/videos/2026-05-04_abc123_停止期待
+#   bash run.sh 7234567890123456789 ~/my-channel/videos/2026-05-04_abc123_stop-expecting
 #
 # Output: writes report.md INTO the video_folder.
 # Exit codes:
@@ -71,7 +71,7 @@ fi
 # Verify auth/ exists in project root (cookie persistence)
 if [[ ! -d "$PROJECT_ROOT/.auth" ]]; then
   cat >&2 <<EOF
-❌ Not logged in to 抖音 创作者中心.
+❌ Not logged in to the Douyin creator center.
 
 First-time login (one-shot):
   cd "$PROJECT_ROOT"

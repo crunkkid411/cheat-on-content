@@ -1,145 +1,145 @@
-# Starter Rubric：短文 (X / 微博 / 即刻 threads) — v0 cold-start 占位
+# Starter Rubric: short text (X / Weibo / Jike threads) — v0 cold-start placeholder
 
-**这是给完全没数据的新作者用的占位 rubric。**它会打错。**前 5 条预测精度大概 ±50%——这是 cold-start 的数学事实，不是 rubric 失败**。
+**This is a placeholder rubric for new writers with absolutely no data.** It will score things wrong. **Prediction accuracy for the first 5 posts is roughly ±50% — that is a mathematical fact of cold-start, not a rubric failure.**
 
-跑完 5 条（每条都走完 `/cheat-predict` → 发布 → `/cheat-retro` 闭环）之后，你会有第一份个人校准数据，可以提议第一次 `/cheat-bump` 升级到 v1。
+After running 5 posts (each completing the `/cheat-predict` → publish → `/cheat-retro` loop), you will have your first personal calibration data and can propose the first `/cheat-bump` to v1.
 
 ---
 
-## v0 综合分公式（**等权占位**）
+## v0 composite formula (**equal-weight placeholder**)
 
 ```
 composite = (ER + HP + QL + NA + AB + SR + SAT) / 7 × 2.0
 ```
 
-每个维度 0-5 整数分。综合分范围 0-10。
+Each dimension is an integer 0-5. The composite range is 0-10.
 
-**为什么等权**：你没有数据支持任何特定权重。等权能让你在数据出来之前对每个维度都给"中立的关注"。第 5 条之后你的复盘数据会告诉你哪些维度真的预测了你的账号的传播。
-
----
-
-## 7 个维度
-
-### ER — Emotional Resonance（情感共鸣）
-*这条能不能在滑过的瞬间让人产生一种**具体的、能命名的**情感？*
-
-- **0** — 纯信息 / 通知性内容
-- **3** — 有共鸣但不够锐利，"嗯说得对"然后划走
-- **5** — 一击即中；读完忍不住转发或截图
-
-### HP — Hook Potential（钩子强度）
-*第一行能不能让拇指停下来？*
-
-短文的钩子就是第一行——它必须在信息流里和一百条动态竞争注意力。
-
-- **0** — 通用开头（"今天想聊聊..."）
-- **3** — 有反直觉断言或具体数字
-- **5** — 第一句话本身就是一个完整的、令人无法忽略的观点炸弹
-
-### QL — Quotable Lines（可传播密度）
-*这条的某一句话能被单独截图传播吗？*
-
-短文整条就是"金句"的载体——但真正的 QL 是：读者会不会**只截你某一句**发到另一个平台。
-
-- **0** — 整条是叙述 / 日记，没有可独立传播的句子
-- **3** — 整条作为一个单元可传播
-- **5** — 其中某一句能脱离语境独立爆炸
-
-### NA — Narrativity（线程弧线）
-*如果是 thread / 连续微博，有没有让人想滑到最后一条的弧线？*
-
-- **0** — 单条无弧线（正常）/ thread 但每条是独立碎片
-- **3** — thread 有松散主线
-- **5** — thread 有"追剧感"——必须看到最后一条
-
-单条帖子 NA 通常给 1-2 即可——短文的传播主要靠 ER/HP/QL。
-
-### AB — Audience Breadth（受众广度）
-*这条话题的潜在受众有多广？*
-
-- **0** — 极小众圈层梗
-- **3** — 特定群体（职场 / 互联网圈 / 家长）
-- **5** — 普世——任何人看了都有感觉
-
-### SR — Social Resonance（社会议题共振）
-*这条触及当下的集体情绪或社会模式吗？*
-
-- **0** — 纯个人 / 自说自话
-- **3** — 蹭到热点但没新视角
-- **5** — 用 280 字命名了一个大家感受到但没人说出来的结构
-
-### SAT — Satire Depth（讽刺 / 语调深度）
-*这条的语调有多少"装置感"——阴阳、反讽、戏仿？*
-
-- **0** — 真诚直陈
-- **3** — 一层阴阳 / 反讽
-- **5** — 嵌套反讽 / 自指——"一条讽刺讽刺的帖子"
-
-短文平台上讽刺 / 阴阳是传播利器。如果你的风格是真诚向，SAT 给 2-3 当占位。
+**Why equal weights**: you have no data supporting any particular weight. Equal weights let you give each dimension "neutral attention" before the data arrives. After the 5th post your retro data will tell you which dimensions actually predict spread on your account.
 
 ---
 
-## Bucket 预测：比率桶方案
+## The 7 dimensions
 
-> ⚠️ **新人的 bucket 不能用绝对数字**——大 V 的"1000 转算塌房"对新号来说是梦想数据。
+### ER — Emotional Resonance
+*Can this post make someone feel a **concrete, nameable** emotion in the instant they scroll past?*
 
-### 第 1 条：平台通用默认
+- **0** — Pure information / notification content
+- **3** — Resonates but not sharply enough — "yeah, true" and then they scroll on
+- **5** — Hits on the first try; after reading they cannot help reposting or screenshotting
 
-X / 微博 / 即刻新号第 1 条的典型分布：
+### HP — Hook Potential
+*Can the first line stop the thumb?*
 
-| Bucket | 范围（曝光 / 互动）| 先验概率 |
+A short post's hook is its first line — it must compete for attention with a hundred feed items.
+
+- **0** — Generic opening ("today I want to talk about...")
+- **3** — A counterintuitive assertion or a concrete number
+- **5** — The first sentence is itself a complete, impossible-to-ignore opinion bomb
+
+### QL — Quotable Lines (spread density)
+*Can one sentence from this post be screenshotted and spread on its own?*
+
+The whole short post is the vehicle for the "quotable line" — but real QL means: will the reader **screenshot just one sentence** and post it on another platform?
+
+- **0** — The whole post is narration / a diary; no independently spreadable sentence
+- **3** — The post as a unit is spreadable
+- **5** — One sentence can detonate independently outside its context
+
+### NA — Narrativity (thread arc)
+*If it is a thread / consecutive Weibo posts, is there an arc that makes people want to scroll to the last one?*
+
+- **0** — A single post with no arc (normal) / a thread where each post is an independent fragment
+- **3** — The thread has a loose throughline
+- **5** — The thread has "binge-watch feel" — you must see the last post
+
+For a single post, NA is usually 1-2 — short-text spread relies mainly on ER/HP/QL.
+
+### AB — Audience Breadth
+*How broad is the potential audience for this topic?*
+
+- **0** — Very niche circle meme
+- **3** — A specific group (office workers / internet industry / parents)
+- **5** — Universal — anyone who reads it feels something
+
+### SR — Social Resonance
+*Does this post touch the current collective mood or social pattern?*
+
+- **0** — Purely personal / talking to yourself
+- **3** — Rides a trend but adds no new perspective
+- **5** — Names, in 280 characters, a structure everyone feels but nobody has said
+
+### SAT — Satire Depth (irony / tone depth)
+*How much "device" is in the tone — passive aggression, irony, parody?*
+
+- **0** — Sincere direct statement
+- **3** — One layer of passive aggression / irony
+- **5** — Nested irony / self-reference — "a post satirizing satire"
+
+On short-text platforms, satire / passive aggression is a spread weapon. If your style is sincere, give SAT 2-3 as a placeholder.
+
+---
+
+## Bucket prediction: ratio bucket scheme
+
+> ⚠️ **A newcomer's buckets cannot use absolute numbers** — a big-V's "1,000 reposts means a fall from grace" is dream data for a new account.
+
+### Post 1: platform-generic defaults
+
+The typical distribution for a new account's first post on X / Weibo / Jike:
+
+| Bucket | Range (impressions / interactions) | Prior probability |
 |---|---|---|
-| 底部 | < 50 曝光 | 30% |
-| 基础盘 | 50 - 500 曝光 | 40% |
-| 命中 | 500 - 5,000 曝光 | 20% |
-| 小爆 | 5,000 - 50,000 曝光 | 8% |
-| 大爆 | > 50,000 曝光 | 2% |
+| Floor | < 50 impressions | 30% |
+| Base | 50 - 500 impressions | 40% |
+| Hit | 500 - 5,000 impressions | 20% |
+| Small hit | 5,000 - 50,000 impressions | 8% |
+| Big hit | > 50,000 impressions | 2% |
 
-> 即刻以互动（点赞 + 评论）为主要指标，曝光数据不透明——用互动数代替。
+> Jike uses interactions (likes + comments) as its main metric and impression data is opaque — use the interaction count instead.
 
-### 第 2 条起：用比率桶
+### From post 2 on: use ratio buckets
 
-`baseline = 上一条实际曝光 / 互动`（或最近 3 条中位数）。
+`baseline = the previous post's actual impressions / interactions` (or the median of the last 3).
 
-| Bucket | 倍数范围 | 含义 |
+| Bucket | Multiple range | Meaning |
 |---|---|---|
-| 退步 | < 0.3 × baseline | 明显下滑 |
-| 持平 | 0.3 - 1 × baseline | 同档 |
-| 命中 | 1 - 3 × baseline | 中度突破 |
-| 小爆 | 3 - 10 × baseline | 显著破圈 |
-| 大爆 | > 10 × baseline | 量级跃迁 |
+| Regression | < 0.3 × baseline | Clear decline |
+| Flat | 0.3 - 1 × baseline | Same tier |
+| Hit | 1 - 3 × baseline | Moderate breakthrough |
+| Small hit | 3 - 10 × baseline | Significant breakout |
+| Big hit | > 10 × baseline | Order-of-magnitude leap |
 
-第 5 条后跑 `/cheat-bump --bucket-only` 重新校准边界。
+After the 5th post, run `/cheat-bump --bucket-only` to recalibrate the boundaries.
 
 ---
 
-## Cold-start 战略（简版）
+## Cold-start strategy (short version)
 
-前 5 条的"预测"不是预测——是**数据采集**。
+The "predictions" for the first 5 posts are not predictions — they are **data collection**.
 
-1. **建立纪律**：发布前写下盲判断
-2. **记录 7 维评分**：复盘后每条样本变成 (打分, 实绩) 配对
-3. **取样策略**：主动选维度组合差异最大的帖子——1 条 ER 主导、1 条 SR 主导、1 条 SAT 主导（阴阳怪气）、1 条 HP 极强但内容一般、1 条综合中等
+1. **Build discipline**: write a blind judgment before publishing
+2. **Record 7-dimension scores**: after the retro each sample becomes a (score, actual) pair
+3. **Sampling strategy**: actively pick posts with the most divergent dimension combinations — 1 ER-dominant, 1 SR-dominant, 1 SAT-dominant (snarky), 1 with an extremely strong HP but ordinary content, 1 medium all-round
 
-| 校准样本 | 你能相信什么 |
+| Calibration samples | What you can trust |
 |---|---|
-| N=0-2 | 啥都别信 |
-| N=3-5 | 相信"哪个维度可能重要"的方向 |
-| N=5-10 | 相信 bucket 排序 |
-| N=10-20 | 中枢可信 ±30% |
-| N≥20 | rubric 真正成为"作弊器" |
+| N=0-2 | Nothing |
+| N=3-5 | Trust the direction of "which dimension may matter" |
+| N=5-10 | Trust bucket ordering |
+| N=10-20 | The center is trustworthy to ±30% |
+| N≥20 | The rubric truly becomes a "cheat code" |
 
 ---
 
-## 重要警告
+## Important warnings
 
-- cold-start 期 composite 的置信度低——**不要基于 v0 分数决定要不要发某条帖子**
-- 短文发布频率高——5 条校准可以在 1-2 周内完成，**不要拖**
-- 前 5 条**每条必须走完整闭环**（predict → 发布 → retro），跳过任何一条复盘 = 整个校准失败
-- 第 5 条后**必须**跑 `/cheat-bump` 升级
+- Cold-start composites have low confidence — **do not decide whether to publish a post based on a v0 score**
+- Short-text publishing is frequent — 5 calibrations can be done in 1-2 weeks, **do not drag it out**
+- The first 5 posts **must each complete the full loop** (predict → publish → retro); skipping any retro = the whole calibration fails
+- After the 5th post you **must** run `/cheat-bump` to upgrade
 
 ---
 
-## 最重要的一句话
+## The most important sentence
 
-**前 5 条你不是在做决策，你是在收集数据。** 短文的好处是迭代快——别浪费这个优势。
+**For the first 5 posts you are not making decisions; you are collecting data.** The advantage of short text is fast iteration — do not waste that advantage.

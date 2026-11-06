@@ -1,100 +1,100 @@
-# 复盘段模板
+# Retrospective section template
 
-> **本模板由 `/cheat-retro` 自动追加到对应 prediction 文件的 `## 复盘` 段**。
-> 不是独立文件——只是 prediction 文件的下半段格式参考。
+> **This template is appended automatically by `/cheat-retro` into the `## Retrospective` section of the matching prediction file.**
+> It is not a standalone file — it is only the format reference for the lower half of a prediction file.
 >
-> 示例数据来自视频分析项目的「停止期待」复盘（[predictions/2026-04-24_ab61ed09_停止期待.md] 的复盘段）。
+> Example data comes from the video-analysis project's "Stop expecting" retrospective (the retrospective section of [predictions/2026-04-24_ab61ed09_stop-expecting.md]).
 >
-> 完整规范见 [shared-references/prediction-anatomy.md](../cheat-on-content/shared-references/prediction-anatomy.md) 的"复盘段"部分。
+> Full spec: the "retrospective section" part of [shared-references/prediction-anatomy.md](../cheat-on-content/shared-references/prediction-anatomy.md).
 
 ---
 
-## 复盘
+## Retrospective
 
-**复盘时间**: `<YYYY-MM-DD>`（发布 T+`<N>`d）
-**抓取时间**: `<YYYY-MM-DD HH:MM>`
-**数据来源**: `manual paste` / `adapter:<platform>`
+**Retro at**: `<YYYY-MM-DD>` (publish T+`<N>`d)
+**Fetched at**: `<YYYY-MM-DD HH:MM>`
+**Data source**: `manual paste` / `adapter:<platform>`
 
-### 实绩数据
+### Actual performance
 
-- 播放：**`<X>`w**（落在 \``<bucket>`\` 桶内 [偏高 / 偏低 / 中枢]，相对中枢 `<X>`w **`<+X% / -X%>`**）
-- 点赞：`<X>`w（赞播比 `<X.XX%>`）
-- 评论：`<N>`（评播比 `<X.XXX%>`）
-- 收藏：`<N>`
-- 分享：**`<X>`w**（分播比 **`<X.XX%>`**，[强 / 中 / 弱]）
+- Plays: **`<X>`w** (landed in the \``<bucket>`\` bucket [high / low / center], **`<+X% / -X%>`** vs the `<X>`w center)
+- Likes: `<X>`w (like/play ratio `<X.XX%>`)
+- Comments: `<N>` (comment/play ratio `<X.XXX%>`)
+- Saves: `<N>`
+- Shares: **`<X>`w** (share/play ratio **`<X.XX%>`**, [strong / medium / weak])
 
-> **示例**（停止期待 T+7d）：
-> - 播放：**71.1w**（落在 `30-100w` 桶内偏高，相对中枢 50w **+42%**）
-> - 点赞：2.4w（赞播比 3.38%）
-> - 评论：899（评播比 0.126%，**为同期视频之首**）
-> - 收藏：5251
-> - 分享：**1.8w**（分播比 **2.53%**，强）
+> **Example** (Stop expecting, T+7d):
+> - Plays: **711k** (landed in the `30-100w` bucket on the high side, **+42%** vs the 500k center)
+> - Likes: 24k (like/play ratio 3.38%)
+> - Comments: 899 (comment/play ratio 0.126%, **highest among videos from the same period**)
+> - Saves: 5,251
+> - Shares: **18k** (share/play ratio **2.53%**, strong)
 
-> **关键派生比率必须算出来**：赞播比、评播比、分播比——它们是单纯播放数无法暴露的信号。
-> 比如视频分析项目发现"分播比"是 TS（议题分享冲动）维度的最强外部代理：求职 0.96% vs 停止期待 2.53%——同 composite 但分播比差 2.6 倍。
+> **Key derived ratios must be computed**: like/play, comment/play, share/play — they expose signals that raw play count cannot.
+> For example, the video-analysis project found that "share/play ratio" is the strongest external proxy for the TS (issue-share impulse) dimension: job-hunting 0.96% vs Stop expecting 2.53% — same composite but a 2.6x difference in share/play ratio.
 
-### Top 评论关键词
+### Top comment keywords
 
-> 把粘进来的 N 条评论分 3-5 类（高赞模因 / 概念引用 / 离题噪声 / 转发暴露暗示 / @朋友传播 等），
-> 每类列代表性评论 + 赞数 + 比例。
+> Split the N pasted comments into 3-5 categories (high-like meme / concept reference / off-topic noise / repost-exposure hint / @friend propagation, etc.),
+> and list representative comments + like counts + proportions for each.
 
-- **「[关键模因 / 句式]」**: [赞数] 独占 / 高频出现 N 次变体（[简短描述模式]）
-- **「[次级模因]」**: [赞数] [次级模式描述]
-- **戒断 / 共鸣 / 戏仿 类**: [赞数] [代表性评论]
-- **拓展引用**: [其他衍生模式]
-- **@朋友传播 / 自嘲共谋**: [评论区是否在做这件事]
+- **"[key meme / sentence pattern]"**: [like count] alone at the top / appears N times in variants ([short description of the pattern])
+- **"[secondary meme]"**: [like count] [secondary pattern description]
+- **Withdrawal / resonance / parody category**: [like count] [representative comment]
+- **Extended references**: [other derivative patterns]
+- **@friend propagation / self-deprecating complicity**: [whether the comments are doing this]
 
-> **示例**：
-> - **「她不一样」/「他不一样」模因爆发**：2266 赞独占榜首，且全文出现至少 12 次（193、5、5、5、3、4、4、2、2、2、2、1...重复变体），观众**主动套用句式自嘲**——这是关键级模因
-> - **「Joker / 小丑 / 舔狗」二级模因**：412 赞「薛定谔的Joker/Crush叠加态」、74 赞「我自己想转圈圈」
-> - **戒断方法被认真转译**：27 赞「1.少想 2.别相信美好 3.重构滤镜」——观众主动 RTF
-> - **@朋友传播**：大量 @ 链——评论区是社交场，观众把视频当作"骂朋友 / 自嘲共谋"工具
+> **Example**:
+> - **"She's different" / "He's different" meme explosion**: 2,266 likes alone at the top, and appears at least 12 times across the text (193, 5, 5, 5, 3, 4, 4, 2, 2, 2, 2, 1... repeated variants), with the audience **actively reusing the pattern to mock themselves** — this is a critical-tier meme
+> - **"Joker / simp" secondary meme**: 412 likes "Schrödinger's Joker/Crush superposition", 74 likes "I want to spin in circles myself"
+> - **Withdrawal methods seriously translated**: 27 likes "1. Think less 2. Don't believe in the good 3. Rebuild the filter" — the audience actively RTFs
+> - **@friend propagation**: a large number of @ chains — the comment section is a social venue; the audience uses the video as a tool to "roast friends / self-deprecate in complicity"
 
-### 哪些预测被验证 ✅ / 推翻 ❌
+### Which predictions were validated ✅ / refuted ❌
 
-**被验证 ✅**:
-- [关键校准假设是否成立] [带具体数字的对比]
-- [推理因素表里哪些被验证]
-- [反事实场景里哪个 bucket 被命中]
+**Validated ✅**:
+- [whether the critical calibration hypothesis held] [comparison with specific numbers]
+- [which reasoning factors were validated]
+- [which bucket in the counterfactual scenarios was hit]
 
-**被推翻 ❌**:
-- [中枢偏差超 ±25% 的话明确写]
-- [反事实里"如果 X 意味着 Y"的 Y 是否真的发生]
-- [推理因素表里"高置信度"被推翻的项 → rubric bug 信号]
+**Refuted ❌**:
+- [state it explicitly if the center was off by more than ±25%]
+- [whether the Y in "if X means Y" actually happened]
+- [items in the reasoning-factor table whose "high confidence" was refuted → rubric bug signal]
 
-> **示例**：
-> **被验证 ✅**:
-> - 关键校准假设**完全成立**：本篇 71.1w / 谁问你了 11.7w = **6.07x**，远超我押的 1.5-2x
-> - ER=5 主导情感传播力 → **H1 强证据**
-> - HP=5 验证：分播比 2.53%，金句"间歇性希望"被高频引用
+> **Example**:
+> **Validated ✅**:
+> - The critical calibration hypothesis **held completely**: this piece 711k / Who asked you 117k = **6.07x**, far above my 1.5-2x bet
+> - ER=5 drove emotional spread → **strong evidence for H1**
+> - HP=5 validated: share/play ratio 2.53%; the quotable line "intermittent hope" was quoted frequently
 >
-> **被推翻 ❌**:
-> - 中枢 50w 被超出 +42%：低估了"她不一样"模因的二创病毒级
-> - 反事实推理里"必须搭配强社会议题才能破 30w"**完全错误**——SR=2 也轻松破 70w
-> - 我对 SR 的押注（"H2 SR 应上调"）**反向被推翻**：SR 在情感向场景**几乎不贡献**
+> **Refuted ❌**:
+> - The 500k center was exceeded by +42%: I underestimated the viral-tier remixing of the "she's different" meme
+> - The counterfactual reasoning "must be paired with a strong social issue to break 300k" was **completely wrong** — SR=2 broke 700k easily
+> - My bet on SR ("H2: SR should be raised") was **refuted in the opposite direction**: SR contributes **almost nothing** in emotionally driven scenarios
 
-> **关键纪律**：每条验证 / 推翻必须引用具体数据（"分播比 2.53%"），不许写"基本符合"这种含糊措辞。
+> **Key discipline**: every validation / refutation must cite specific data ("share/play ratio 2.53%"); vague phrasing such as "basically consistent" is not allowed.
 
-### 需要写进 rubric-memo.md 的新观察
+### New observations to write into rubric-memo.md
 
-1. **[一句话规律标题]**：[具体证据，引用具体数据点]
-2. **[第二条规律]**：[同上]
-3. **[候选维度命名建议]**：[如观察到 rubric 没捕获的维度，提议候选维度名 + 评分定义草案]
+1. **[One-line rule title]**: [specific evidence, citing specific data points]
+2. **[Second rule]**: [same as above]
+3. **[Candidate dimension naming suggestion]**: [if a dimension the rubric does not capture is observed, propose a candidate dimension name + draft scoring definition]
 
-> **示例**：
-> 1. **ER 在情感向场景的真实权重应 ≥ ×2.0**：与谁问你了 6x 流量比是 v2 rubric 最强的反事实证据
-> 2. **议题分享冲动 (TS) 是隐藏维度**：joker / "她不一样" / 滤镜重构提供了**安全的自嘲身份**，转发不暴露处境，TS=5 的样本
-> 3. **HP × ER 共振效应**：ER=5 + HP=5 + 可挪用模因句 = 病毒级；缺一不可
-> 4. **"二创句式" 维度候选 (Memetic Shareability, MS)**：观众能不能用作者的句式造句？停止期待 = Y（她不一样无穷变体），谁问你了 = N（无需求信息供给只能引用）
+> **Example**:
+> 1. **The true weight of ER in emotionally driven scenarios should be ≥ ×2.0**: the 6x traffic ratio vs Who asked you is the strongest counterfactual evidence for the v2 rubric
+> 2. **Issue-share impulse (TS) is a hidden dimension**: Joker / "she's different" / filter rebuilding provided a **safe self-deprecating identity** where reposting does not expose one's situation; a TS=5 sample
+> 3. **HP × ER resonance effect**: ER=5 + HP=5 + a reusable meme sentence = viral tier; missing any one breaks it
+> 4. **"Remixable sentence pattern" candidate dimension (Memetic Shareability, MS)**: can the audience form sentences with the author's pattern? Stop expecting = Y (endless "she's different" variants), Who asked you = N (only demand for information, quotable but not remixable)
 
-> 每条观察必须可追溯到具体数据点（不写"情感很重要"——写"ER5/SR2 vs ER3/SR4 同 composite 下流量差 6x"）。
-> 这些观察会被 `/cheat-retro` 自动写到 `rubric-memo.md` 的"观察记录"段。`rubric_notes.md` 是 blind 白名单，只能在后续 `/cheat-bump` 时接收抽象后的通用规则，不能写入样本名、实绩、评论或链接。
+> Every observation must be traceable to specific data points (do not write "emotion matters" — write "ER5/SR2 vs ER3/SR4 at the same composite differ 6x in traffic").
+> These observations are written by `/cheat-retro` into the "Observation log" section of `rubric-memo.md`. `rubric_notes.md` is the blind whitelist and may only receive abstracted generic rules during a later `/cheat-bump`; sample names, actual performance, comments, or links must never be written into it.
 
-### Bump 触发评估
+### Bump trigger evaluation
 
-- 偏差方向：[high / low / on-target]
-- 累计同向偏差：[N 次（包含本次）]
-- 是否触发 bump 提议：[是 / 否]
+- Miss direction: [high / low / on-target]
+- Cumulative same-direction misses: [N times (including this one)]
+- Does it trigger a bump proposal: [yes / no]
 
-> 如累计同向偏差 ≥3，`/cheat-retro` 会在末尾输出"建议跑 /cheat-bump"提示。
-> 实际 bump 通过 `/cheat-bump` 完成，本段只是触发器记录。
+> If the cumulative same-direction misses are ≥3, `/cheat-retro` outputs a "consider running /cheat-bump" reminder at the end.
+> The actual bump is done through `/cheat-bump`; this section only records the trigger.

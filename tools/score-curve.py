@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-score-curve.py — predict accuracy convergence chart for cheat-on-content.
+score-curve.py — prediction-accuracy convergence chart for cheat-on-content.
 
 Reads predictions/*.md (in the user's project), pairs each prediction's
 center-of-bucket estimate against actual plays from the retrospective section,
@@ -29,8 +29,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-# Bucket center mapping (the "中枢" if the prediction file doesn't spell it out
-# explicitly). Units: 万 (10,000 plays). Adjust per platform if needed.
+# Bucket center mapping (the "center" if the prediction file doesn't spell it out
+# explicitly). Units: w (10,000 plays; the templates keep the platform unit "w").
+# Adjust per platform if needed.
 BUCKET_CENTERS = {
     "<5w": 2.5,
     "5-30w": 17.5,
@@ -40,9 +41,16 @@ BUCKET_CENTERS = {
 }
 
 PREDICTION_HEADER_RE = re.compile(r"^\*\*Bucket\*\*:\s*`?([^`\n]+?)`?\s*$", re.MULTILINE)
-CENTER_RE = re.compile(r"中枢\s*[~约]?\s*(\d+(?:\.\d+)?)\s*w", re.IGNORECASE)
-ACTUAL_PLAYS_RE = re.compile(r"播放[：:]\s*\*?\*?(\d+(?:\.\d+)?)\s*w", re.IGNORECASE)
+# Accepts both the English "center ~50w" and the legacy Chinese "中枢 ~50w".
+CENTER_RE = re.compile(r"(?:中枢|[Cc]enter)\s*[:~≈约=]?\s*(\d+(?:\.\d+)?)\s*([wWkK万]?)", re.IGNORECASE)
+# Accepts both the English "Plays: **711k**" and the legacy Chinese "播放：711w".
+ACTUAL_PLAYS_RE = re.compile(r"(?:播放|Plays)\s*[：:]\s*[`*\s]*(\d+(?:\.\d+)?)\s*([wWkK万]?)", re.IGNORECASE)
+# Section heading: English template first, legacy Chinese heading kept for old files.
+RETRO_HEADINGS = ("## Retrospective", "## 复盘")
 DATE_FROM_FILENAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})_")
+
+# Normalize a parsed number + unit to w (10,000 plays), the unit used by buckets/centers.
+_UNIT_TO_W = {"": 1.0, "w": 1.0, "万": 1.0, "k": 0.1, "m": 100.0}
 
 
 @dataclass
@@ -70,6 +78,10 @@ class Sample:
         return abs(sep) if sep is not None else None
 
 
+def _to_w(number: str, unit: str) -> float:
+    return float(number) * _UNIT_TO_W.get((unit or "").lower(), 1.0)
+
+
 def parse_prediction_file(path: Path) -> Sample:
     text = path.read_text(encoding="utf-8")
 
@@ -79,17 +91,21 @@ def parse_prediction_file(path: Path) -> Sample:
         raise ValueError(f"{path.name}: filename does not start with YYYY-MM-DD_")
     date = datetime.strptime(m.group(1), "%Y-%m-%d")
 
-    # Split prediction vs retro section
-    pred_section, _, retro_section = text.partition("## 复盘")
+    # Split prediction vs retro section (supports both English and legacy Chinese headings)
+    retro_idx = min((text.find(h) for h in RETRO_HEADINGS if text.find(h) != -1), default=-1)
+    if retro_idx == -1:
+        pred_section, retro_section = text, ""
+    else:
+        pred_section, retro_section = text[:retro_idx], text[retro_idx:]
 
     # Bucket from prediction section
     bm = PREDICTION_HEADER_RE.search(pred_section)
     bucket = bm.group(1).strip() if bm else None
 
-    # Predicted center: prefer explicit "中枢 ~50w", fall back to bucket midpoint
+    # Predicted center: prefer explicit "center ~50w", fall back to bucket midpoint
     cm = CENTER_RE.search(pred_section)
     if cm:
-        predicted_center_w = float(cm.group(1))
+        predicted_center_w = _to_w(cm.group(1), cm.group(2))
     elif bucket and bucket in BUCKET_CENTERS:
         predicted_center_w = BUCKET_CENTERS[bucket]
     else:
@@ -100,7 +116,7 @@ def parse_prediction_file(path: Path) -> Sample:
     if retro_section.strip():
         am = ACTUAL_PLAYS_RE.search(retro_section)
         if am:
-            actual_plays_w = float(am.group(1))
+            actual_plays_w = _to_w(am.group(1), am.group(2))
 
     return Sample(
         file=path,
@@ -143,8 +159,8 @@ def render_chart(samples: list[Sample], out_path: Path, window: int) -> bool:
     except ImportError:
         return False
 
-    # Try to find a CJK-capable font so Chinese labels render. Falls back silently
-    # to default if none available — labels will show as boxes but the chart still works.
+    # Prefer a CJK-capable font in case any labels contain platform text. Falls
+    # back silently to default if none is available — the chart still renders.
     for cand in ("PingFang SC", "Heiti SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", "WenQuanYi Zen Hei"):
         try:
             if any(cand.lower() in f.name.lower() for f in font_manager.fontManager.ttflist):
@@ -166,14 +182,14 @@ def render_chart(samples: list[Sample], out_path: Path, window: int) -> bool:
     indices = list(range(1, len(samples_with_retro) + 1))
 
     fig, ax = plt.subplots(figsize=(10, 5))
-    ax.bar(indices, abs_errors, alpha=0.3, label=f"|误差%| 单篇", color="steelblue")
-    ax.plot(indices, rolling, marker="o", linewidth=2, label=f"|误差%| 滚动 {window} 篇均值", color="firebrick")
-    ax.axhline(50, linestyle="--", linewidth=1, color="gray", label="cold-start 期参考线 (±50%)")
-    ax.axhline(25, linestyle=":", linewidth=1, color="green", label="校准成熟期目标 (±25%)")
+    ax.bar(indices, abs_errors, alpha=0.3, label="|error %| per piece", color="steelblue")
+    ax.plot(indices, rolling, marker="o", linewidth=2, label=f"|error %| rolling {window}-piece mean", color="firebrick")
+    ax.axhline(50, linestyle="--", linewidth=1, color="gray", label="cold-start reference (±50%)")
+    ax.axhline(25, linestyle=":", linewidth=1, color="green", label="calibration-maturity target (±25%)")
 
-    ax.set_xlabel("第 N 篇校准样本")
-    ax.set_ylabel("|预测中枢偏差%|")
-    ax.set_title("Cheat-on-Content — 预测精度收敛曲线")
+    ax.set_xlabel("Calibration sample N")
+    ax.set_ylabel("|prediction center error %|")
+    ax.set_title("Cheat-on-Content — prediction accuracy convergence curve")
     ax.set_xticks(indices)
     ax.set_xticklabels([s.date.strftime("%m-%d") for s in samples_with_retro], rotation=45, ha="right")
     ax.legend(loc="upper right")

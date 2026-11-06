@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# xhs-explore adapter wrapper（小红书）
+# xhs-explore adapter wrapper (Xiaohongshu)
 #
 # Called by /cheat-retro when state.data_collection=adapter and platform=xhs.
 #
@@ -8,7 +8,7 @@
 #   bash run.sh <note_id> <video_folder> [<script_path>]
 #
 # Example:
-#   bash run.sh 66f1a2b3c4d5e6f700112233 ~/my-channel/videos/2026-05-04_abc123_标题
+#   bash run.sh 66f1a2b3c4d5e6f700112233 ~/my-channel/videos/2026-05-04_abc123_title
 #
 # Output: writes report.md INTO the video_folder.
 # Exit codes:
@@ -74,7 +74,7 @@ fi
 # Verify auth dir exists in project root (cookie persistence)
 if [[ ! -d "$PROJECT_ROOT/.auth-xhs" ]]; then
   cat >&2 <<EOF
-❌ Not logged in to 小红书 创作者中心.
+❌ Not logged in to the Xiaohongshu creator center.
 
 First-time login (one-shot):
   cd "$PROJECT_ROOT"

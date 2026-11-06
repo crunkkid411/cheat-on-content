@@ -1,14 +1,14 @@
-"""发完笔记后跑一次：抓数据 + 评论 → 生成 report.md。
+"""Run once after publishing a note: fetch data + comments -> generate report.md.
 
-用法：
-    python review.py                       # 交互式选笔记
-    python review.py login                 # 仅登录（首次扫码）
-    python review.py list                  # 列最近笔记（验证登录态）
-    python review.py note <note_id> [script.txt]   # 直接指定笔记
-    python review.py archive <notes.json> [output_root] [limit]   # 批量归档正文+图片
-    python review.py summarize [out_dir]   # 账号级汇总（基于最近 50 条）
+Usage:
+    python review.py                       # interactive note picker
+    python review.py login                 # login only (first QR-code scan)
+    python review.py list                  # list recent notes (verify the login session)
+    python review.py note <note_id> [script.txt]   # specify the note directly
+    python review.py archive <notes.json> [output_root] [limit]   # bulk-archive body + images
+    python review.py summarize [out_dir]   # account-level summary (based on the latest 50)
 
-archive / summarize 能力来自 xhs-analytics 的公开页解析，可无登录抓取正文与图片。
+archive / summarize capabilities come from xhs-analytics' public-page parsing and can fetch body and images without login.
 """
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def _log(msg: str) -> None:
 
 
 def _parse_note_arg(arg: str) -> tuple[str, str | None]:
-    """接受 note_id 或完整笔记 URL（含 xsec_token）。返回 (note_id, note_url|None)。"""
+    """Accept a note_id or a full note URL (with xsec_token). Returns (note_id, note_url|None)."""
     arg = arg.strip().strip("'").strip('"')
     if arg.startswith("http"):
         m = re.search(r"/(?:explore|discovery/item)/([0-9a-zA-Z]+)", arg)
@@ -64,14 +64,14 @@ def _prompt(msg: str) -> str:
 
 def _pick_note(notes: list[dict]) -> dict | None:
     if not notes:
-        print("未抓到笔记列表。请确认创作者中心已登录，或页面结构已变，需要更新 crawler。")
+        print("Could not fetch the note list. Confirm the creator center is logged in, or the page structure changed and the crawler needs updating.")
         return None
-    print("\n最近笔记：")
+    print("\nRecent notes:")
     for i, n in enumerate(notes):
         t = renderer._fmt_time(n.get("create_time", 0))
         title = (n.get("title") or "").replace("\n", " ")[:40]
-        print(f"  [{i}] {t} | 曝光 {renderer._fmt_num(n.get('view_count'))} | {title}")
-    choice = _prompt("\n选择序号（回车取消）：")
+        print(f"  [{i}] {t} | impressions {renderer._fmt_num(n.get('view_count'))} | {title}")
+    choice = _prompt("\nPick an index (Enter to cancel): ")
     if not choice.isdigit():
         return None
     idx = int(choice)
@@ -84,7 +84,7 @@ async def run() -> None:
     active_videos_dir = videos_dir()
     active_videos_dir.mkdir(parents=True, exist_ok=True)
 
-    print("[选笔记] 打开创作者中心拉列表……")
+    print("[pick note] Opening the creator center to pull the list...")
     sess = await crawler.Session.open()
     try:
         notes = await crawler.fetch_recent_notes(sess, limit=10)
@@ -92,17 +92,17 @@ async def run() -> None:
         await sess.close()
     note = _pick_note(notes)
     if not note:
-        print("已取消。")
+        print("Cancelled.")
         return
 
-    script_raw = _prompt("把稿子 txt 拖进来（或回车跳过）：")
+    script_raw = _prompt("Drag the script txt here (or press Enter to skip): ")
     script_path: str | None = None
     if script_raw.strip():
         p = Path(script_raw.strip().strip("'").strip('"').replace("\\ ", " ")).expanduser()
         if p.is_file():
             script_path = str(p)
         else:
-            print(f"[警告] 找不到 {p}，稿子留空。")
+            print(f"[warning] Cannot find {p}; leaving the script empty.")
 
     await run_with_id(note["note_id"], script_path)
 
@@ -118,11 +118,11 @@ async def run_with_id(note_arg: str, script_path: str | None) -> None:
         p = Path(script_path).expanduser()
         if p.is_file():
             script = p.read_text(encoding="utf-8", errors="ignore")
-            print(f"稿子：{p.name}（{len(script)} 字符）")
+            print(f"Script: {p.name} ({len(script)} characters)")
         else:
-            print(f"[警告] 找不到稿子 {p}")
+            print(f"[warning] Cannot find script {p}")
 
-    print(f"[抓取] 笔记 {note_id}" + ("（带 token URL）" if note_url else ""))
+    print(f"[fetch] Note {note_id}" + (" (tokenized URL)" if note_url else ""))
     result = await crawler.fetch_all(note_id, note_url=note_url)
     note = result["note"]
     comments = result["comments"]
@@ -132,7 +132,7 @@ async def run_with_id(note_arg: str, script_path: str | None) -> None:
     if script:
         (out_dir / "script.txt").write_text(script, encoding="utf-8")
 
-    # 可选：下载图片到本地（默认关闭；通过环境变量 XHS_DOWNLOAD_IMAGES=1 开启）
+    # Optional: download images locally (off by default; enable with the environment variable XHS_DOWNLOAD_IMAGES=1)
     if os.environ.get("XHS_DOWNLOAD_IMAGES", "").lower() in ("1", "true", "yes"):
         img_dir = out_dir / "images"
         img_dir.mkdir(parents=True, exist_ok=True)
@@ -140,7 +140,7 @@ async def run_with_id(note_arg: str, script_path: str | None) -> None:
         for i, url in enumerate(note.get("images", []), 1):
             dest = img_dir / f"{i:02d}"
             if await crawler.download_image(url, dest):
-                # download_image 会根据 Content-Type 修正扩展名，这里找回真实文件名
+                # download_image fixes the extension from Content-Type; recover the real filename here
                 actual = next(dest.parent.glob(f"{dest.name}.*"), dest)
                 paths.append(str(actual.relative_to(out_dir)).replace("\\", "/"))
         if paths:
@@ -149,11 +149,11 @@ async def run_with_id(note_arg: str, script_path: str | None) -> None:
     md = renderer.render_report(note, script, comments)
     report = out_dir / "report.md"
     report.write_text(md, encoding="utf-8")
-    print(f"\n✓ {report}")
+    print(f"\nOK {report}")
 
 
 # ---------------------------------------------------------------------------
-# archive: 批量归档已发布笔记的正文、图片、标签（公开页解析，无登录）
+# archive: bulk-archive published notes' body, images, and tags (public-page parsing, no login)
 # ---------------------------------------------------------------------------
 
 async def run_archive(input_path: Path, output_root: Path, limit: int | None = None,
@@ -163,11 +163,11 @@ async def run_archive(input_path: Path, output_root: Path, limit: int | None = N
     log_path = output_root / f"archive_{time.strftime('%Y%m%d_%H%M%S')}.log"
     LOG_FILE = open(log_path, "w", encoding="utf-8", errors="replace")
     try:
-        _log(f"启动归档: input={input_path}, output={output_root}")
+        _log(f"Starting archive: input={input_path}, output={output_root}")
 
         notes = json.loads(input_path.read_text(encoding="utf-8"))
         if not isinstance(notes, list):
-            raise ValueError("输入 JSON 必须是笔记列表")
+            raise ValueError("input JSON must be a list of notes")
 
         notes = sorted(notes, key=lambda x: x.get("time", ""), reverse=True)
         if limit:
@@ -182,17 +182,17 @@ async def run_archive(input_path: Path, output_root: Path, limit: int | None = N
                 results.append({
                     "success": False,
                     "note_id": note_id,
-                    "error": "缺少 note_id 或 xsec_token",
+                    "error": "missing note_id or xsec_token",
                 })
                 continue
 
             out_dir = output_root / note_id
-            _log(f"({i}/{len(notes)}) 归档 {note_id} {title[:30]}...")
+            _log(f"({i}/{len(notes)}) Archiving {note_id} {title[:30]}...")
             try:
                 public = await asyncio.to_thread(crawler.fetch_public_note, note_id, xsec)
                 if not public.get("success"):
-                    err = public.get("error", "公开页解析失败")
-                    _log(f"  -> 失败: {err}")
+                    err = public.get("error", "public-page parsing failed")
+                    _log(f"  -> failed: {err}")
                     results.append({"success": False, "note_id": note_id, "error": err})
                     continue
 
@@ -222,10 +222,10 @@ async def run_archive(input_path: Path, output_root: Path, limit: int | None = N
                     "image_count": img_count,
                     "comment_count": public.get("comments_fetched", 0),
                 }
-                _log(f"  -> 完成: 图片 {img_count} 张")
+                _log(f"  -> done: {img_count} images")
                 results.append(summary)
             except Exception as e:
-                _log(f"  -> 异常: {e}")
+                _log(f"  -> exception: {e}")
                 results.append({"success": False, "note_id": note_id, "error": str(e)})
 
             if i < len(notes):
@@ -234,8 +234,8 @@ async def run_archive(input_path: Path, output_root: Path, limit: int | None = N
         summary_path = output_root / f"archive_summary_{time.strftime('%Y%m%d_%H%M%S')}.json"
         summary_path.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
         success = sum(1 for r in results if r.get("success"))
-        _log(f"完成: 成功 {success}, 失败 {len(results) - success}, 总计 {len(results)}")
-        _log(f"汇总: {summary_path}")
+        _log(f"Done: {success} succeeded, {len(results) - success} failed, {len(results)} total")
+        _log(f"Summary: {summary_path}")
     finally:
         if LOG_FILE is not None:
             LOG_FILE.close()
@@ -243,46 +243,46 @@ async def run_archive(input_path: Path, output_root: Path, limit: int | None = N
 
 
 # ---------------------------------------------------------------------------
-# summarize: 账号级汇总（基于创作者中心最近笔记 + 公开页标签）
+# summarize: account-level summary (based on the creator center's latest notes + public-page tags)
 # ---------------------------------------------------------------------------
 
 def _series_of(note: dict) -> str:
-    """按标签/标题关键字给笔记归系列，简单兜底。"""
+    """Group notes into series by tag/title keyword; a simple fallback."""
     tags = note.get("tags") or []
     if tags:
         return tags[0]
     title = note.get("title", "")
-    # 常见系列关键字（可扩展）
+    # Common series keywords (extendable)
     for kw in ("Agent", "RAG", "CS336", "Lec", "MCP", "LLM"):
         if kw.lower() in title.lower():
             return kw
-    return "其他"
+    return "Other"
 
 
 def _summarize(notes: list[dict]) -> str:
     lines: list[str] = []
-    lines.append("# xhs-explore 账号汇总\n")
-    lines.append(f"生成时间：{time.strftime('%Y-%m-%d %H:%M')}")
-    lines.append(f"样本数：{len(notes)} 篇\n")
+    lines.append("# xhs-explore account summary\n")
+    lines.append(f"Generated at: {time.strftime('%Y-%m-%d %H:%M')}")
+    lines.append(f"Sample size: {len(notes)} notes\n")
 
     total_view = sum(n.get("view_count", 0) or 0 for n in notes)
     total_like = sum(n.get("like_count", 0) or 0 for n in notes)
     total_collect = sum(n.get("collect_count", 0) or 0 for n in notes)
     total_comment = sum(n.get("comment_count", 0) or 0 for n in notes)
-    lines.append("## 整体数据\n")
-    lines.append(f"- 总浏览：{total_view:,}")
-    lines.append(f"- 总点赞：{total_like:,}")
-    lines.append(f"- 总收藏：{total_collect:,}")
-    lines.append(f"- 总评论：{total_comment:,}")
+    lines.append("## Overall data\n")
+    lines.append(f"- Total views: {total_view:,}")
+    lines.append(f"- Total likes: {total_like:,}")
+    lines.append(f"- Total saves: {total_collect:,}")
+    lines.append(f"- Total comments: {total_comment:,}")
     if total_view:
-        lines.append(f"- 平均赞阅比：{total_like / total_view * 100:.2f}%")
-        lines.append(f"- 平均藏阅比：{total_collect / total_view * 100:.2f}%")
+        lines.append(f"- Average like-to-view ratio: {total_like / total_view * 100:.2f}%")
+        lines.append(f"- Average save-to-view ratio: {total_collect / total_view * 100:.2f}%")
     lines.append("")
 
-    # 按浏览 Top 10
+    # Top 10 by views
     sorted_notes = sorted(notes, key=lambda x: x.get("view_count", 0) or 0, reverse=True)[:10]
-    lines.append("## 浏览量 Top 10\n")
-    lines.append("| 排名 | 标题 | 浏览 | 点赞 | 收藏 | 评论 |")
+    lines.append("## Views top 10\n")
+    lines.append("| Rank | Title | Views | Likes | Saves | Comments |")
     lines.append("|------|------|------|------|------|------|")
     for idx, n in enumerate(sorted_notes, 1):
         title = (n.get("title") or "")[:30]
@@ -292,12 +292,12 @@ def _summarize(notes: list[dict]) -> str:
         )
     lines.append("")
 
-    # 系列汇总
+    # Series summary
     series: dict[str, list[dict]] = defaultdict(list)
     for n in notes:
         series[_series_of(n)].append(n)
-    lines.append("## 系列汇总（按首标签/标题关键字）\n")
-    lines.append("| 系列 | 篇数 | 总浏览 | 均浏览 | 赞阅比 | 藏阅比 | 评阅比 |")
+    lines.append("## Series summary (by first tag / title keyword)\n")
+    lines.append("| Series | Notes | Total views | Avg views | Like rate | Save rate | Comment rate |")
     lines.append("|------|------|--------|--------|--------|--------|--------|")
     for name, items in sorted(series.items(), key=lambda x: sum(i.get("view_count", 0) or 0 for i in x[1]), reverse=True):
         views = sum(i.get("view_count", 0) or 0 for i in items)
@@ -315,23 +315,23 @@ def _summarize(notes: list[dict]) -> str:
     lines.append("")
 
     lines.append(
-        "> 提示：系列判定优先取公开页标签，无标签时按标题关键字兜底。"
-        "可通过 `review.py archive` 批量归档后人工校准。\n"
+        "> Tip: series assignment prefers the public-page tag; without a tag it falls back to title keywords."
+        "Run `review.py archive` to bulk-archive, then calibrate manually.\n"
     )
     return "\n".join(lines)
 
 
 async def run_summarize(out_dir: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
-    print("[summarize] 拉取创作者中心最近 50 条笔记……")
-    # summarize 是批量后台命令，用 headless 避免弹窗打扰
+    print("[summarize] Pulling the creator center's latest 50 notes...")
+    # summarize is a batch background command; use headless to avoid popup windows
     sess = await crawler.Session.open(headless=True)
     try:
         notes = await crawler.fetch_recent_notes(sess, limit=50)
     finally:
         await sess.close()
 
-    # 用公开页补全标签/正文/图片（失败也不阻塞）
+    # Fill in tags/body/images from the public page (a failure does not block)
     for n in notes:
         xsec = n.get("xsec_token") or ""
         if not xsec:
@@ -345,15 +345,15 @@ async def run_summarize(out_dir: Path) -> None:
     md = _summarize(notes)
     out_path = out_dir / f"xhs_summary_{time.strftime('%Y%m%d_%H%M%S')}.md"
     out_path.write_text(md, encoding="utf-8")
-    print(f"\n✓ {out_path}")
+    print(f"\nOK {out_path}")
 
 
 def _usage() -> str:
     return """
-用法:
-  python review.py                       交互式选笔记
-  python review.py login                 扫码登录
-  python review.py list                  列最近笔记
+Usage:
+  python review.py                       interactive note picker
+  python review.py login                 scan the QR code to log in
+  python review.py list                  list recent notes
   python review.py note <note_id> [script.txt]
   python review.py archive <notes.json> [output_root] [limit]
   python review.py summarize [out_dir]
@@ -361,7 +361,7 @@ def _usage() -> str:
 
 
 def main() -> None:
-    # Windows Git Bash 等默认 GBK 控制台，emoji/中文 print 会崩溃，强制 UTF-8 输出
+    # Windows Git Bash etc. default to a GBK console where emoji/Chinese print crashes; force UTF-8 output
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
@@ -370,7 +370,7 @@ def main() -> None:
         return
     if len(sys.argv) > 1 and sys.argv[1] == "note":
         if len(sys.argv) < 3:
-            print("用法：python review.py note <note_id> [script.txt]")
+            print("Usage: python review.py note <note_id> [script.txt]")
             sys.exit(2)
         note_id = sys.argv[2]
         script_path = sys.argv[3] if len(sys.argv) > 3 else None
@@ -386,7 +386,7 @@ def main() -> None:
             for i, n in enumerate(notes):
                 t = renderer._fmt_time(n.get("create_time", 0))
                 title = (n.get("title") or "").replace("\n", " ")[:50]
-                print(f"[{i}] {n['note_id']}  {t}  曝光{renderer._fmt_num(n.get('view_count'))}  {title}")
+                print(f"[{i}] {n['note_id']}  {t}  impressions {renderer._fmt_num(n.get('view_count'))}  {title}")
         asyncio.run(_list())
         return
     if len(sys.argv) > 1 and sys.argv[1] == "archive":

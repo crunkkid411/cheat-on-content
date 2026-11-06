@@ -62,7 +62,7 @@ if ! "$PYTHON" -c "import playwright" 2>/dev/null; then
   exit 2
 fi
 if [[ ! -d "$PROJECT_ROOT/.auth-wechat-channels" ]]; then
-  echo "视频号助手未登录，请先运行: $PYTHON \"$ADAPTER_DIR/review.py\" login" >&2
+  echo "WeChat Channels assistant is not logged in. Run first: $PYTHON \"$ADAPTER_DIR/review.py\" login" >&2
   exit 1
 fi
 

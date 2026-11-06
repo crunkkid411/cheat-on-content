@@ -1,19 +1,19 @@
-"""小红书创作者中心 + 前台评论抓取。
+"""Xiaohongshu creator center + frontend comment crawling.
 
-登录一次后，Cookie 持久化在 .auth-xhs/，之后直接复用。
-一次抓取共享一个 Chromium 会话，稳定性优于每步一个进程。
+After logging in once, the cookie is persisted in .auth-xhs/ and reused directly afterwards.
+A single crawl shares one Chromium session, which is more stable than one process per step.
 
-设计原则（和 douyin-session 一致）：
-- 不逆向 x-s / x-t 签名、不伪造请求——用登录态浏览器，让页面自己发带签名的请求，
-  我们只被动拦截返回的 JSON。
-- 创作者**自己的**笔记数据走 galaxy 接口（不需要 xsec_token），是最稳的主路。
-- 评论走前台 web API（需要 xsec_token），让页面自己导航触发带 token 的请求；
-  拿不到就优雅降级（report.md 标 comments_unavailable，cheat-retro 回落到 manual 粘评论）。
+Design principles (same as douyin-session):
+- Do not reverse-engineer the x-s / x-t signatures and do not forge requests — use a logged-in browser,
+  let the page send its own signed requests, and only passively intercept the returned JSON.
+- The creator's **own** note data goes through the galaxy API (no xsec_token needed) — the most stable main path.
+- Comments go through the frontend web API (needs xsec_token) by letting the page navigate itself to trigger tokenized requests;
+  when unavailable, degrade gracefully (report.md marks comments_unavailable and cheat-retro falls back to manually pasted comments).
 
-本文件新增的能力（来自 xhs-analytics 的公开页解析）：
-- fetch_public_note: 无登录解析 explore 页面 __INITIAL_STATE__，拿正文 / 图片 / 标签。
-- fetch_public_comments: 公开页兜底 top 评论。
-- download_image: 下载笔记图片到本地。
+New capabilities in this file (public-page parsing from xhs-analytics):
+- fetch_public_note: parse the explore page's __INITIAL_STATE__ without login, for body / images / tags.
+- fetch_public_comments: public-page fallback for top comments.
+- download_image: download a note image locally.
 """
 from __future__ import annotations
 
@@ -30,16 +30,16 @@ from paths import auth_dir, debug_dir
 
 CREATOR_HOME = "https://creator.xiaohongshu.com/new/home"
 CREATOR_NOTE_MANAGER = "https://creator.xiaohongshu.com/new/note-manager"
-# galaxy 接口路径片段——宽松匹配，接口偶有版本号变化
+# galaxy API path fragments — loose matching, the API occasionally changes its version number
 GALAXY_NOTE_LIST_KEYS = (
-    # 松匹配后缀，兼容 /api/galaxy/creator/... 与 /api/galaxy/v2/creator/...（实测是 v2）
+    # Loose suffix match, compatible with /api/galaxy/creator/... and /api/galaxy/v2/creator/... (v2 in practice)
     "/creator/note/user/posted",
 )
 GALAXY_NOTE_STATS_KEYS = (
     "/api/galaxy/creator/data/note_stats",
     "/api/galaxy/creator/data/note_detail",
 )
-# 前台 web API
+# Frontend web API
 FEED_KEY = "/api/sns/web/v1/feed"
 COMMENT_KEY = "/api/sns/web/v2/comment/page"
 
@@ -50,7 +50,7 @@ DEFAULT_USER_AGENT = (
 
 
 class Session:
-    """单浏览器会话，按顺序跑多步抓取。"""
+    """Single browser session that runs multiple crawl steps in order."""
 
     def __init__(self, ctx: BrowserContext, pw: Any) -> None:
         self.ctx = ctx
@@ -70,7 +70,7 @@ class Session:
         try:
             ctx = await pw.chromium.launch_persistent_context(**common_kwargs)
         except Exception as exc:
-            # 部分环境只装了系统 Chrome，没下载 Playwright Chromium，fallback 到 channel=chrome
+            # Some environments only have system Chrome installed, not Playwright Chromium — fall back to channel=chrome
             try:
                 ctx = await pw.chromium.launch_persistent_context(
                     **common_kwargs, channel="chrome"
@@ -86,15 +86,15 @@ class Session:
             await self.pw.stop()
 
 
-# 创作者中心登录凭证——扫码登 creator.xiaohongshu.com 产生的就是这些（galaxy 主路只需它们）。
-# 注意：创作者中心登录 *不* 产生 web_session（那是主站 www 前台 cookie），早期版本只认
-# web_session 是个 bug，会导致登录成功却一直检测不到、白等超时。
+# Creator-center login credentials — scanning the QR code at creator.xiaohongshu.com produces these (the galaxy main path only needs them).
+# Note: logging in to the creator center does *not* produce web_session (that is the main site www frontend cookie). Early versions
+# only recognized web_session, which was a bug: login succeeded but was never detected, and the tool waited until timeout for nothing.
 CREATOR_LOGIN_COOKIES = (
     "access-token-creator.xiaohongshu.com",
     "galaxy_creator_session_id",
     "customer-sso-sid",
 )
-# 主站前台凭证——feed / 评论 web API 需要；只在登录后访问过 www 才会下发。
+# Main-site frontend credentials — needed by the feed / comment web APIs; only issued after visiting www while logged in.
 WEB_LOGIN_COOKIE = "web_session"
 
 
@@ -118,63 +118,63 @@ async def _has_web_session(ctx: BrowserContext) -> bool:
 
 
 async def _acquire_web_session(page: Page) -> None:
-    """创作者中心登录后，访问主站让 SSO 下发 web_session（前台 feed/评论需要）。best-effort。"""
+    """After creator-center login, visit the main site so SSO issues web_session (needed by frontend feed/comments). Best-effort."""
     try:
         await page.goto("https://www.xiaohongshu.com/explore",
                         wait_until="domcontentloaded", timeout=30000)
         await asyncio.sleep(3)
         if await _has_web_session(page.context):
-            print("[登录] ✓ 已获取主站 web_session（前台评论/互动可用）")
+            print("[login] OK: acquired main-site web_session (frontend comments/interactions available)")
         else:
-            print("[登录] 注意：未拿到 web_session，前台评论可能要 manual；galaxy 主路不受影响。")
+            print("[login] Note: no web_session obtained; frontend comments may need manual input; the galaxy main path is unaffected.")
     except Exception:
         pass
 
 
 async def ensure_login(timeout_s: int = 180, max_refresh: int = 5) -> bool:
-    """扫码登录创作者中心；检测到创作者登录态后顺便换取 web_session，然后自动关闭。
+    """Scan the QR code to log in to the creator center; once the creator login is detected, exchange for web_session and close automatically.
 
-    二维码本身会过期，所以用 timeout_s 作为单次等待上限，超时后自动刷新页面重新出码，
-    最多刷新 max_refresh 次。用户有充足时间扫码。
+    The QR code itself expires, so timeout_s is the per-attempt wait limit; after it, the page is refreshed to show a new code,
+    up to max_refresh times. This gives the user plenty of time to scan.
     """
     sess = await Session.open()
     try:
         page = await sess.ctx.new_page()
         await page.goto(CREATOR_HOME)
-        print(f"[登录] 在弹出的 Chromium 窗口里扫码登录小红书创作者中心。每次二维码有效期约 {timeout_s} 秒，超时自动刷新。")
+        print(f"[login] Scan the QR code in the Chromium window to log in to the Xiaohongshu creator center. Each QR code is valid for about {timeout_s} seconds; it refreshes automatically on timeout.")
 
         for refresh in range(max_refresh + 1):
             for i in range(timeout_s):
                 try:
                     if await _creator_logged_in(sess.ctx) and "login" not in page.url:
-                        print(f"[登录] ✓ 创作者中心登录态已确认（总用时 {refresh * timeout_s + i}s）")
+                        print(f"[login] OK: creator-center login confirmed (total {refresh * timeout_s + i}s)")
                         await _acquire_web_session(page)
                         await asyncio.sleep(1)
                         return True
                 except Exception:
                     pass
 
-                # 每 30 秒提醒一次，避免用户以为卡死
+                # Remind every 30 seconds so the user does not think it is stuck
                 if i > 0 and i % 30 == 0:
-                    print(f"[登录] 已等待 {i} 秒，请用小红书 App 扫码（或等待自动刷新二维码）……")
+                    print(f"[login] Waited {i}s; please scan with the Xiaohongshu app (or wait for the QR code to refresh)...")
 
                 await asyncio.sleep(1)
 
             if refresh < max_refresh:
-                print(f"[登录] 本次二维码未扫码或已过期，正在刷新页面重新出码（第 {refresh + 1}/{max_refresh} 次刷新）……")
+                print(f"[login] QR code not scanned or expired; refreshing the page for a new code (refresh {refresh + 1}/{max_refresh})...")
                 try:
                     await page.reload(wait_until="domcontentloaded", timeout=30000)
                 except Exception:
                     await page.goto(CREATOR_HOME)
 
-        print("[登录] 超过最大刷新次数仍未检测到登录态，已停止。如需继续请重新运行本命令。")
+        print("[login] Maximum refreshes reached without detecting a login; stopped. Rerun this command to continue.")
         return False
     finally:
         await sess.close()
 
 
 async def fetch_recent_notes(sess: Session, limit: int = 50) -> list[dict]:
-    """创作者中心笔记管理页 → 拦截 galaxy 笔记列表 + 单篇运营数据（含曝光/浏览）。"""
+    """Creator-center note manager page -> intercept the galaxy note list + per-note operational data (including impressions/views)."""
     captured: list[dict] = []
     all_urls: list[str] = []
 
@@ -187,7 +187,7 @@ async def fetch_recent_notes(sess: Session, limit: int = 50) -> list[dict]:
                 data = await resp.json()
                 captured.append({"url": resp.url, "data": data})
                 if len(captured) == 1 and isinstance(data, dict):
-                    print(f"[诊断] galaxy 接口 keys: {list(data.keys())[:8]}")
+                    print(f"[diagnostic] galaxy API keys: {list(data.keys())[:8]}")
             except Exception:
                 pass
 
@@ -195,9 +195,9 @@ async def fetch_recent_notes(sess: Session, limit: int = 50) -> list[dict]:
     try:
         await page.goto(CREATOR_NOTE_MANAGER, wait_until="domcontentloaded", timeout=60000)
         await asyncio.sleep(8)
-        # cookie 过期时会被 302 到登录页
+        # An expired cookie gets a 302 to the login page
         if "login" in page.url or "redirectReason=401" in page.url:
-            print("[登录] 创作者中心已跳转登录页，cookie 可能已过期。请运行：python crawler.py login")
+            print("[login] The creator center redirected to the login page; the cookie may have expired. Run: python crawler.py login")
             return []
         for _ in range(4):
             await page.evaluate("window.scrollBy(0, 1200)")
@@ -205,17 +205,17 @@ async def fetch_recent_notes(sess: Session, limit: int = 50) -> list[dict]:
         notes = _parse_note_list(captured, limit)
         if not notes:
             _dump(all_urls, "creator_urls.txt", captured, "creator_captured.json")
-            print(f"[诊断] 笔记列表为空，{len(all_urls)} 个请求已 dump 到 .cheat-cache/xhs-explore-debug/。")
+            print(f"[diagnostic] Note list empty; {len(all_urls)} requests dumped to .cheat-cache/xhs-explore-debug/.")
         return notes
     finally:
         await page.close()
 
 
 def _iter_candidates(data: Any) -> list:
-    """从任意 galaxy response 里挖出"笔记数组"。结构多变，宽松找。"""
+    """Dig the "note array" out of any galaxy response. The structure varies; match loosely."""
     out: list = []
     if isinstance(data, dict):
-        # 常见包装：{data: {...}} / {data: [...]} / 顶层直接 list 字段
+        # Common wrappers: {data: {...}} / {data: [...]} / a top-level list field
         inner = data.get("data") if isinstance(data.get("data"), (dict, list)) else data
         targets = [inner] if not isinstance(inner, list) else []
         if isinstance(inner, list):
@@ -238,7 +238,7 @@ def _parse_note_list(captured: list[dict], limit: int) -> list[dict]:
             note = _normalize_note(raw)
             if not note["note_id"]:
                 continue
-            # 同一 note 可能在 list 接口和 stats 接口各出现一次——合并，非空字段优先
+            # The same note may appear once in the list API and once in the stats API — merge, preferring non-empty fields
             existing = by_id.get(note["note_id"])
             if existing:
                 for k, v in note.items():
@@ -261,10 +261,10 @@ def _first(d: dict, *keys: str) -> Any:
 
 def _normalize_note(v: dict) -> dict:
     note_id = v.get("note_id") or v.get("id") or v.get("noteId") or ""
-    # 字段名已用真实返回校准（2026-05 /api/galaxy/v2/creator/note/user/posted）：
-    #   观看 view_count | 点赞 likes | 收藏 collected_count | 评论 comments_count
-    #   分享 shared_count | 发布时间 visible_time(unix秒) | 单篇 token xsec_token
-    # 确认名放首位，旧候选留作兜底以防接口再次改版。
+    # Field names are calibrated against real responses (2026-05 /api/galaxy/v2/creator/note/user/posted):
+    #   views view_count | likes likes | saves collected_count | comments comments_count
+    #   shares shared_count | publish time visible_time (unix seconds) | per-note token xsec_token
+    # Confirmed names come first; older candidates remain as fallbacks in case the API changes again.
     return {
         "note_id": str(note_id),
         "title": v.get("display_title") or v.get("title") or v.get("desc") or v.get("name") or "",
@@ -275,7 +275,7 @@ def _normalize_note(v: dict) -> dict:
         "comment_count": _to_int(_first(v, "comments_count", "comment_count", "comment", "cmt_count")),
         "share_count": _to_int(_first(v, "shared_count", "share_count", "share")),
         "fans_inc": _to_int(_first(v, "fans", "fans_inc", "new_fans", "follow_count")),
-        "post_time_str": v.get("time") or "",  # galaxy 自带本地时间串，比 epoch 省去时区换算
+        "post_time_str": v.get("time") or "",  # galaxy provides a local time string, saving timezone conversion from epoch
         "xsec_token": v.get("xsec_token") or "",
         "note_type": v.get("type") or "",
         "raw": v,
@@ -292,11 +292,11 @@ def _to_int(x: Any) -> int:
 
 
 # ---------------------------------------------------------------------------
-# 公开页解析（来自 xhs-analytics 的核心能力）：无登录拿正文、图片、标签、评论兜底
+# Public-page parsing (core capability from xhs-analytics): body, images, tags, comment fallback without login
 # ---------------------------------------------------------------------------
 
 def _extract_initial_state(html: str) -> dict | None:
-    """从小红书 explore 页面 HTML 中解析 window.__INITIAL_STATE__。"""
+    """Parse window.__INITIAL_STATE__ out of the Xiaohongshu explore page HTML."""
     marker = "window.__INITIAL_STATE__="
     start = html.find(marker)
     if start == -1:
@@ -317,7 +317,7 @@ def _extract_initial_state(html: str) -> dict | None:
 
 
 def _image_url(img: dict) -> str:
-    """从 imageList 元素中提取可用的图片 URL。"""
+    """Extract a usable image URL from an imageList element."""
     if not isinstance(img, dict):
         return ""
     for key in ("urlDefault", "url"):
@@ -333,7 +333,7 @@ def _image_url(img: dict) -> str:
 
 
 def _xsec_token_from_url(url: str | None) -> str:
-    """从笔记 URL 的 query 中拆出 xsec_token（保留原编码）。"""
+    """Pull xsec_token out of a note URL's query (preserving the original encoding)."""
     if not url:
         return ""
     parsed = urllib.parse.urlparse(url)
@@ -341,9 +341,9 @@ def _xsec_token_from_url(url: str | None) -> str:
 
 
 def fetch_public_note(note_id: str, xsec_token: str) -> dict:
-    """无登录抓取 explore 公开页，解析 __INITIAL_STATE__。
+    """Fetch the public explore page without login and parse __INITIAL_STATE__.
 
-    返回 dict：success, note_id, title, desc/body, images, tags, time, counts, raw。
+    Returns a dict: success, note_id, title, desc/body, images, tags, time, counts, raw.
     """
     token = urllib.parse.unquote(xsec_token)
     url = (
@@ -361,11 +361,11 @@ def fetch_public_note(note_id: str, xsec_token: str) -> dict:
 
     state = _extract_initial_state(r.text)
     if not state:
-        raise ValueError("无法解析页面初始状态")
+        raise ValueError("could not parse the page's initial state")
 
     note_detail_map = state.get("note", {}).get("noteDetailMap", {})
     if note_id not in note_detail_map:
-        raise ValueError("页面未返回该笔记数据")
+        raise ValueError("the page did not return data for this note")
 
     raw = note_detail_map[note_id]
     note = raw.get("note", {})
@@ -392,7 +392,7 @@ def fetch_public_note(note_id: str, xsec_token: str) -> dict:
 
 
 def _normalize_public_comment(c: dict) -> dict:
-    """把 __INITIAL_STATE__ / edith 接口里的评论字段统一成 adapter 格式。"""
+    """Normalize comment fields from __INITIAL_STATE__ / the edith API into the adapter format."""
     user = c.get("user_info") or c.get("userInfo") or {}
     like_count = c.get("like_count") or c.get("likeCount") or 0
     sub_count = c.get("sub_comment_count") or c.get("subCommentCount") or 0
@@ -408,7 +408,7 @@ def _normalize_public_comment(c: dict) -> dict:
 
 
 def fetch_public_comments(note_id: str, xsec_token: str, max_comments: int = 20) -> list[dict]:
-    """公开页 __INITIAL_STATE__ 兜底 top 评论（通常 ~10 条）。"""
+    """Public-page __INITIAL_STATE__ fallback for top comments (usually ~10)."""
     token = urllib.parse.unquote(xsec_token)
     url = (
         f"https://www.xiaohongshu.com/explore/{note_id}"
@@ -428,7 +428,7 @@ def fetch_public_comments(note_id: str, xsec_token: str, max_comments: int = 20)
 
     raw = state.get("note", {}).get("noteDetailMap", {}).get(note_id, {})
     comments = []
-    # __INITIAL_STATE__ 里的评论路径可能是 comments.list 或 commentsList
+    # The comment path inside __INITIAL_STATE__ may be comments.list or commentsList
     for key in ("comments", "commentsList"):
         container = raw.get(key) if isinstance(raw, dict) else None
         if isinstance(container, dict):
@@ -450,7 +450,7 @@ def fetch_public_comments(note_id: str, xsec_token: str, max_comments: int = 20)
 
 
 async def download_image(url: str, dest: Path, timeout: int = 30) -> bool:
-    """下载单张图片到 dest（会根据 Content-Type 修正扩展名）。异步封装。"""
+    """Download a single image to dest (fixing the extension from Content-Type). Async wrapper."""
     if not url:
         return False
     dest = Path(dest)
@@ -489,7 +489,7 @@ async def download_image(url: str, dest: Path, timeout: int = 30) -> bool:
     try:
         return await asyncio.to_thread(_download)
     except Exception as exc:
-        print(f"[下载图片] 失败 {url}: {exc}")
+        print(f"[download image] Failed {url}: {exc}")
         return False
 
 
@@ -499,15 +499,15 @@ async def fetch_note_frontend(
     note_url: str | None = None,
     xsec_token: str | None = None,
 ) -> dict:
-    """打开前台笔记页 → 拦截 feed（interact_info 确认字段）+ comment/page。
+    """Open the frontend note page -> intercept feed (confirmed interact_info fields) + comment/page.
 
-    前台需要 xsec_token + 登录态（web_session）。
-    - 若传入 note_url（含 xsec_token，如从创作者后台复制的 ?xsec_token=...&xsec_source=pc_creatormng）
-      → 直接用它导航，最稳。
-    - 否则退回裸 explore URL（仅对已登录账号访问自己笔记可能可行）。
-    token 缺失 / 未登录 → dump 并降级（评论留给 manual）。
+    The frontend needs xsec_token + a login session (web_session).
+    - If note_url is passed (containing xsec_token, e.g. ?xsec_token=...&xsec_source=pc_creatormng copied from the creator backend)
+      -> navigate with it directly; most stable.
+    - Otherwise fall back to the bare explore URL (may only work for a logged-in account visiting its own note).
+    Token missing / not logged in -> dump and degrade (comments left to manual).
 
-    拦截不到评论时，会用公开页 __INITIAL_STATE__ 里的 top 评论兜底。
+    When comments cannot be intercepted, falls back to the top comments in the public page's __INITIAL_STATE__.
     """
     feed: dict = {}
     comments: list[dict] = []
@@ -539,12 +539,12 @@ async def fetch_note_frontend(
         try:
             await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         except Exception as e:
-            print(f"[警告] 笔记页加载异常：{e}")
+            print(f"[warning] Note page load error: {e}")
         await asyncio.sleep(5)
         if "website-login/error" in page.url or "登录" in (await page.title()):
-            print("[警告] 触发登录墙（安全限制）——cookie 未登录或已过期。先跑 crawler.py login 扫码。")
+            print("[warning] Hit a login wall (security restriction) — the cookie is not logged in or has expired. Run crawler.py login to scan the QR code.")
 
-        # 滚动评论区触发分页懒加载
+        # Scroll the comment area to trigger paginated lazy loading
         last = 0
         stagnant = 0
         for _ in range(40):
@@ -559,7 +559,7 @@ async def fetch_note_frontend(
                 stagnant = 0
                 last = cur
 
-        # 兜底：公开页 __INITIAL_STATE__ 里的 top 评论
+        # Fallback: top comments in the public page's __INITIAL_STATE__
         if not comments:
             xsec = xsec_token or _xsec_token_from_url(note_url)
             if xsec:
@@ -569,9 +569,9 @@ async def fetch_note_frontend(
                     )
                     if public_comments:
                         comments = public_comments
-                        print(f"       公开页兜底 {len(comments)} 条评论")
+                        print(f"       public-page fallback: {len(comments)} comments")
                 except Exception as exc:
-                    print(f"[诊断] 公开页评论兜底失败：{exc}")
+                    print(f"[diagnostic] Public-page comment fallback failed: {exc}")
 
         if not comments:
             dbg = debug_dir()
@@ -581,9 +581,9 @@ async def fetch_note_frontend(
             except Exception:
                 pass
             (dbg / "frontend_urls.txt").write_text("\n".join(all_urls), encoding="utf-8")
-            print("[诊断] 前台未拦到评论（可能 xsec_token 缺失或评论被关），已 dump URL。")
+            print("[diagnostic] No comments intercepted on the frontend (xsec_token may be missing or comments closed); URLs dumped.")
 
-        # 去重 + 按赞降序
+        # Dedupe + sort by likes descending
         seen = set()
         dedup = []
         for c in comments:
@@ -592,14 +592,14 @@ async def fetch_note_frontend(
             seen.add(c["cid"])
             dedup.append(c)
         dedup.sort(key=lambda x: x["like_count"], reverse=True)
-        print(f"       前台共 {len(dedup)} 条评论")
+        print(f"       {len(dedup)} comments on the frontend in total")
         return {"interact": feed, "comments": dedup}
     finally:
         await page.close()
 
 
 def _extract_interact(data: Any) -> dict:
-    """从 feed response 里挖 interact_info（确认字段）。"""
+    """Dig interact_info (confirmed fields) out of a feed response."""
     if not isinstance(data, dict):
         return {}
     items = []
@@ -621,7 +621,7 @@ def _extract_interact(data: Any) -> dict:
 
 
 def _extract_comments(data: Any) -> list[dict]:
-    """comment/page response → 评论列表（确认字段）。"""
+    """comment/page response -> comment list (confirmed fields)."""
     out: list[dict] = []
     if not isinstance(data, dict):
         return out
@@ -657,7 +657,7 @@ def _dump(urls: list[str], url_file: str, captured: list[dict], cap_file: str) -
 
 
 def _merge_public_note(note: dict, public: dict) -> None:
-    """用公开页数据补全 note（不覆盖已有的 galaxy 运营数据）。"""
+    """Fill in note with public-page data (without overwriting existing galaxy operational data)."""
     if not public.get("success"):
         return
     for key in ("title", "desc", "body", "type", "images", "tags"):
@@ -678,19 +678,20 @@ def _merge_public_note(note: dict, public: dict) -> None:
 
 
 async def fetch_all(note_id: str, note_url: str | None = None) -> dict:
-    """一个会话跑完笔记列表（含 galaxy 指标）+ 前台 interact + 评论 + 公开页正文/图片兜底。"""
+    """Run the whole flow in one session: note list (with galaxy metrics) + frontend interact + comments + public-page body/image fallback."""
     sess = await Session.open()
     try:
-        print("  → 打开创作者中心，拉笔记列表 + 运营数据")
+        print("  -> Opening the creator center, pulling the note list + operational data")
         notes = await fetch_recent_notes(sess, limit=50)
         note = next((n for n in notes if n["note_id"] == note_id), None)
         if not note:
-            print(f"       未在最近 {len(notes)} 条里找到 {note_id}，用最小元数据继续。")
+            print(f"       {note_id} not found among the latest {len(notes)} notes; continuing with minimal metadata.")
             note = _normalize_note({"note_id": note_id})
         else:
-            print(f"       ✓ {(note.get('title') or '')[:40]}（曝光 {note.get('view_count')}）")
+            print(f"       OK {(note.get('title') or '')[:40]} (impressions {note.get('view_count')})")
 
-        # 抓自己的笔记时，galaxy 列表已带每条的 xsec_token——自动拼前台 URL，免得手动粘 token 链接
+        # When fetching your own notes, the galaxy list already carries each note's xsec_token — build the frontend URL automatically,
+        # so there is no need to paste a tokenized link by hand
         front_url = note_url
         if not front_url and note.get("xsec_token"):
             front_url = (f"https://www.xiaohongshu.com/explore/{note_id}"
@@ -698,18 +699,18 @@ async def fetch_all(note_id: str, note_url: str | None = None) -> dict:
 
         xsec = _xsec_token_from_url(front_url) or note.get("xsec_token", "")
 
-        # 先用公开页补正文/图片/标签（无登录、低成本），不覆盖 galaxy 已确认的计数
+        # First fill body/images/tags from the public page (no login, low cost), without overwriting galaxy-confirmed counts
         if xsec:
             try:
                 public = await asyncio.to_thread(fetch_public_note, note_id, xsec)
                 _merge_public_note(note, public)
-                print("       ✓ 公开页正文/图片/标签已补全")
+                print("       OK public-page body/images/tags filled in")
             except Exception as exc:
-                print(f"[诊断] 公开页兜底失败：{exc}")
+                print(f"[diagnostic] Public-page fallback failed: {exc}")
 
-        print("  → 打开前台笔记页抓 interact + 评论")
+        print("  -> Opening the frontend note page to capture interact + comments")
         front = await fetch_note_frontend(sess, note_id, note_url=front_url, xsec_token=xsec)
-        # 前台 interact 字段是确认的——用它补全/覆盖 galaxy 里可能缺的计数
+        # Frontend interact fields are confirmed — use them to fill in / override counts that galaxy may be missing
         for k in ("like_count", "collect_count", "comment_count", "share_count"):
             if front["interact"].get(k):
                 note[k] = front["interact"][k]

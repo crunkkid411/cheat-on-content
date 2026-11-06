@@ -20,7 +20,7 @@ def auth_dir(
     env: Mapping[str, str] | None = None,
     cwd: Path | None = None,
 ) -> Path:
-    # 独立于抖音 .auth/ 与小红书 .auth-xhs/，避免多 adapter 共用 project root 时 cookie 串味
+    # Independent from Douyin's .auth/ and Xiaohongshu's .auth-xhs/, so cookies do not cross-contaminate when multiple adapters share a project root
     return runtime_project_root(env=env, cwd=cwd) / ".auth-linkedin"
 
 
